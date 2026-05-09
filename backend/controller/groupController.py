@@ -1,85 +1,43 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
-from datetime import datetime
-from typing import Optional, List
-
-class Group(BaseModel):
-    id: int
-    name: str
-    creationDate: datetime
-    users: List[int] = []
-
-class GroupCreate(BaseModel):
-    name: str
-    users: List[int] = []
-
-class GroupUpdate(BaseModel):
-    name: Optional[str] = None
-    users: Optional[List[int]] = None
-
-class GroupUserAdd(BaseModel):
-    group_id: int
-    user_id: int
+from typing import List
+from service.groupService import (
+    group_service, GroupCreate, GroupUpdate, GroupUserAdd
+)
+from model.group import Group
 
 groupController = APIRouter(
     prefix="/v1/group",
     tags=["Groups"]
 )
 
-@groupController.get("/list", response_model=List[Group])
+@groupController.get("/list")
 def list_groups():
-    return [
-        {
-            "id": 1,
-            "name": "Study Group A",
-            "creationDate": datetime.now(),
-            "users": [1, 2, 3]
-        }
-    ]
+    return group_service.list_groups()
 
-@groupController.get("/{group_id}/members", response_model=List[int])
+@groupController.get("/{group_id}/members")
 def list_group_members(group_id: int):
-    return [1, 2, 3]
+    return group_service.list_group_members(group_id)
 
-@groupController.get("/{group_id}/subjects", response_model=List[str])
+@groupController.get("/{group_id}/subjects")
 def list_group_subjects(group_id: int):
-    return ["Math", "History"]
+    return group_service.list_group_subjects(group_id)
 
-@groupController.post("/create", response_model=Group)
+@groupController.post("/create")
 def create_group(group_in: GroupCreate):
-    return {
-        "id": 10,
-        "name": group_in.name,
-        "creationDate": datetime.now(),
-        "users": group_in.users
-    }
+    return group_service.create_group(group_in)
 
 @groupController.post("/add")
 def add_to_group(payload: GroupUserAdd):
-    return {
-        "message": f"User {payload.user_id} added to group {payload.group_id} successfully"
-    }
+    return group_service.add_user_to_group(payload)
 
-@groupController.get("/{group_id}", response_model=Group)
+@groupController.get("/{group_id}")
 def get_group(group_id: int):
-    return {
-        "id": group_id,
-        "name": "Specific Group",
-        "creationDate": datetime.now(),
-        "users": [1, 2]
-    }
+    return group_service.get_group(group_id)
 
-@groupController.patch("/{group_id}", response_model=Group)
+@groupController.patch("/{group_id}")
 def update_group(group_id: int, group_update: GroupUpdate):
-    return {
-        "id": group_id,
-        "name": group_update.name or "Updated Name",
-        "creationDate": datetime.now(),
-        "users": group_update.users if group_update.users is not None else []
-    }
+    return group_service.update_group(group_id, group_update)
 
 @groupController.delete("/{group_id}")
 def delete_group(group_id: int):
-    return {
-        "message": f"Group {group_id} deleted successfully"
-    }
+    return group_service.delete_group(group_id)

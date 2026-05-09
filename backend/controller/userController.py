@@ -1,44 +1,26 @@
-from fastapi import APIRouter, Body
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter
 from typing import Optional, List
-
-class User(BaseModel):
-  id: int
-  username: str
-  email: str
-
-class UserUpdate(BaseModel):
-    username: Optional[str] = None
-    email: Optional[EmailStr] = None
+from pydantic import BaseModel, EmailStr
+from service.userService import user_service, UserUpdate
+from model.user import User
 
 userController = APIRouter(
     prefix="/v1/user",
     tags=["Users"]
 )
 
-@userController.get("/profile", response_model=User)
+@userController.get("/profile")
 def get_profile(user_id: int):
-    return {
-        "id": user_id,
-        "username": "mario_rossi",
-        "email": "mario@example.com",
-    }
+    return user_service.get_profile(user_id)
 
-@userController.patch("/profile", response_model=User)
+@userController.patch("/profile")
 def update_profile(user_id: int, user_data: UserUpdate):
-    return {
-        "id": user_id,
-        "username": user_data.username,
-        "email": user_data.email
-    }
+    return user_service.update_profile(user_id, user_data)
 
-@userController.get("/groups", response_model=List[str])
+@userController.get("/groups")
 def list_user_groups(user_id: int):
-    return ["admin", "editor"]
+    return user_service.list_user_groups(user_id)
 
 @userController.get("/subjects")
 def list_user_subjects(user_id: int):
-    return {
-        "user_id": user_id,
-        "subjects": ["Math", "Science"]
-    }
+    return user_service.list_user_subjects(user_id)
