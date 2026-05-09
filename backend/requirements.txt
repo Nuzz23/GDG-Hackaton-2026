@@ -1,1 +1,2 @@
 fastapi~=0.136.1
+pydantic
