@@ -1,13 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
+
+from controller.authController import authController
+from controller.groupController import groupController
+from controller.materialController import materialController
+from controller.subjectController import subjectController
+from controller.userController import userController
 
 app = FastAPI()
 
-@app.get("/")
-async def root():
-    return {
-        "message": "Hello World"
-    }
+app.root_path = "/api"
 
-@app.get("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
+app.include_router(authController)
+app.include_router(groupController)
+app.include_router(materialController)
+app.include_router(subjectController)
+app.include_router(userController)
