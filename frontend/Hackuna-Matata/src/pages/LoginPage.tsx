@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import '@/styles/Auth.css';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');

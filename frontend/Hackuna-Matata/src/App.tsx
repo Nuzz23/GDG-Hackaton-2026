@@ -27,8 +27,8 @@ function App() {
 
       <main className="container mx-auto p-4">
         <Routes>
-          {/* public routes */}
-          <Route path="/login" element={<LoginPage />} />
+          {/* public routes LoginPage*/}
+          <Route path="/login" element={<GroupsPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
           {/* protected routes */}

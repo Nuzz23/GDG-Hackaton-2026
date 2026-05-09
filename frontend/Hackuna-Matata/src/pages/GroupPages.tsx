@@ -1,7 +1,7 @@
 // src/pages/GroupsPage.tsx
 import React from 'react';
 import { useGroups } from '../hooks/useGroups';
-// Importa i tuoi componenti UI, es: import { Button, Loader } from '../components';
+import '@/styles/GroupPage.css';
 
 export const GroupsPage: React.FC = () => {
   const { groups, loading, error } = useGroups();
