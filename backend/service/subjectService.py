@@ -1,83 +1,96 @@
+from fastapi import HTTPException, status
 from pydantic import BaseModel
-from datetime import datetime
 from typing import Optional, List
-from model.subject import Subject
+from datetime import datetime
+# Importa il tuo nuovo repository e il costruttore della sessione
 from repository.subjectRepository import SubjectRepository
+from database import SessionLocal
 
-class Subject(BaseModel):
-    id: int
-    name: str
-    deadline: datetime
-    materials: List[int] = []
 
+# --- SCHEMAS ---
 class SubjectCreate(BaseModel):
     name: str
-    deadline: datetime
-    materials: List[int] = []
+    description: Optional[str] = None
+    deadline: Optional[datetime] = None
+
 
 class SubjectUpdate(BaseModel):
     name: Optional[str] = None
+    description: Optional[str] = None
     deadline: Optional[datetime] = None
-    materials: Optional[List[int]] = None
 
+
+# --- SERVICE ---
 class SubjectService:
-    """Service layer for subject operations"""
 
-    def __init__(self):
-        self.repository = SubjectRepository()
+    def list_subjects(self, group_id: int):
+        with SessionLocal() as db:
+            # Usa il metodo statico passando il db
+            return SubjectRepository.get_subjects_by_group(db, group_id=group_id)
 
-    def list_subjects(self, group_id: int) -> List[Subject]:
-        """Get list of subjects for a group"""
-        # TODO: Implement database query
-        return [
-            Subject(
-                id=1,
-                name="Mathematics",
-                deadline=datetime.now(),
-                materials=[101, 102]
+    def create_subject(self, group_id: int, subject_in: SubjectCreate):
+        with SessionLocal() as db:
+            # Espandiamo i dati del Pydantic model come parametri espliciti
+            return SubjectRepository.create_subject(
+                db=db,
+                name=subject_in.name,
+                group_id=group_id,
+                description=subject_in.description,
+                deadline=subject_in.deadline
             )
-        ]
 
-    def get_subject(self, group_id: int, subject_id: int) -> Subject:
-        """Get a specific subject by ID"""
-        # TODO: Implement database query
-        return Subject(
-            id=subject_id,
-            name="Physics",
-            deadline=datetime.now(),
-            materials=[]
-        )
+    def get_subject(self, group_id: int, subject_id: int):
+        with SessionLocal() as db:
+            subject = SubjectRepository.get_subject_by_id(db, subject_id)
 
-    def create_subject(self, group_id: int, subject_in: SubjectCreate) -> Subject:
-        """Create a new subject"""
-        subject = Subject(
-            id=None,  # ID will be assigned by the database
-            name=subject_in.name,
-            deadline=subject_in.deadline,
-            materials=subject_in.materials
-        )
-        return self.repository.insert_subject(group_id, subject)
+            # Controllo di sicurezza: verifica che la materia esista E appartenga al gruppo
+            if not subject or subject.group_id != group_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Materia non trovata o non appartenente a questo gruppo"
+                )
+            return subject
 
-    def update_subject(self, group_id: int, subject_id: int, subject_update: SubjectUpdate) -> Subject:
-        """Update subject information"""
-        existing_subject = self.repository.get_subject_by_id(group_id, subject_id)
-        if not existing_subject:
-            raise ValueError(f"Subject with ID {subject_id} not found")
+    def update_subject(self, group_id: int, subject_id: int, subject_update: SubjectUpdate):
+        with SessionLocal() as db:
+            # 1. Verifichiamo che l'utente abbia il diritto di modificare questa materia (tramite group_id)
+            subject = SubjectRepository.get_subject_by_id(db, subject_id)
+            if not subject or subject.group_id != group_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Materia non trovata o non appartenente a questo gruppo"
+                )
 
-        updated_subject = Subject(
-            id=subject_id,
-            name=subject_update.name or existing_subject.name,
-            deadline=subject_update.deadline or existing_subject.deadline,
-            materials=subject_update.materials if subject_update.materials is not None else existing_subject.materials
-        )
-        return self.repository.update_subject(group_id, updated_subject)
+            # 2. Procediamo con l'aggiornamento
+            updated_subject = SubjectRepository.update_subject(
+                db=db,
+                subject_id=subject_id,
+                name=subject_update.name,
+                description=subject_update.description,
+                deadline=subject_update.deadline
+            )
+            return updated_subject
 
-    def delete_subject(self, group_id: int, subject_id: int) -> dict:
-        """Delete a subject"""
-        self.repository.delete_subject(group_id, subject_id)
-        return {
-            "message": f"Subject {subject_id} for group {group_id} deleted successfully"
-        }
+    def delete_subject(self, group_id: int, subject_id: int):
+        with SessionLocal() as db:
+            # 1. Verifica appartenenza al gruppo
+            subject = SubjectRepository.get_subject_by_id(db, subject_id)
+            if not subject or subject.group_id != group_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Materia non trovata o non appartenente a questo gruppo"
+                )
 
-# Singleton instance
+            # 2. Procediamo con l'eliminazione
+            success = SubjectRepository.delete_subject(db, subject_id)
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Errore durante l'eliminazione della materia"
+                )
+
+            return {"detail": f"Materia {subject_id} eliminata con successo"}
+
+
+# Istanza esportata per l'uso nel Controller
 subject_service = SubjectService()

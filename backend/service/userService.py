@@ -1,70 +1,82 @@
-from typing import Optional, List
+from fastapi import HTTPException, status
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 from repository.userRepository import UserRepository
+# Assicurati di importare il costruttore della sessione dal tuo file database
+from database import SessionLocal
 
-class User(BaseModel):
-    id: int
-    username: str
-    email: str
 
+# --- SCHEMAS ---
 class UserUpdate(BaseModel):
+    """Schema Pydantic per validare i dati di aggiornamento"""
     username: Optional[str] = None
     email: Optional[EmailStr] = None
+    password: Optional[str] = None  # In uno scenario reale, andrà hashata
 
+
+# --- SERVICE ---
 class UserService:
-    """Service layer for user operations"""
 
-    def __init__(self):
-        self.repository = UserRepository()
+    def get_profile(self, user_id: int):
+        with SessionLocal() as db:
+            repo = UserRepository(db)
+            user = repo.get_user_by_id(user_id)
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Utente non trovato"
+                )
+            return user
 
-    def get_profile(self, user_id: int) -> User:
-        """Retrieve user profile by user_id"""
-        # TODO: Implement database query
-        return User(
-            id=user_id,
-            username="mario_rossi",
-            email="mario@example.com",
-        )
+    def update_profile(self, user_id: int, user_data: UserUpdate):
+        with SessionLocal() as db:
+            repo = UserRepository(db)
+            db_user = repo.get_user_by_id(user_id)
 
-    def update_profile(self, user_id: int, user_data: UserUpdate) -> User:
-        """Update user profile"""
-        # TODO: Implement database update
-        return User(
-            id=user_id,
-            username=user_data.username or "mario_rossi",
-            email=user_data.email or "mario@example.com"
-        )
+            if not db_user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Utente non trovato"
+                )
 
-    def list_user_groups(self, user_id: int) -> List[str]:
-        """Get list of groups for a user"""
-        # TODO: Implement database query
-        return ["admin", "editor"]
+            # Converte il modello Pydantic in un dizionario, escludendo i campi non inviati
+            update_dict = user_data.model_dump(exclude_unset=True)
 
-    def list_user_subjects(self, user_id: int) -> dict:
-        """Get list of subjects for a user"""
-        # TODO: Implement database query
-        return {
-            "user_id": user_id,
-            "subjects": ["Math", "Science"]
-        }
+            # Gestione eventuale dell'hashing della password prima del salvataggio
+            if "password" in update_dict:
+                # update_dict["password_hash"] = hash_function(update_dict.pop("password"))
+                update_dict["password_hash"] = update_dict.pop("password")  # Placeholder
 
-    def list_users(self):
-        """Logic to fetch and return all users"""
-        # TODO: Implement database query
-        pass
+            if not update_dict:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Nessun dato valido fornito per l'aggiornamento"
+                )
 
-    def create_user(self, user_data):
-        """Create a new user"""
-        return self.repository.insert_user(user_data)
+            updated_user = repo.update_user(db_user, update_dict)
+            return updated_user
 
-    def update_user(self, user_id, user_data):
-        """Update user information"""
-        return self.repository.update_user(user_id, user_data)
+    def list_user_groups(self, user_id: int):
+        with SessionLocal() as db:
+            repo = UserRepository(db)
+            self._verify_user_exists(repo, user_id)
+            return repo.get_user_groups(user_id)
 
-    def delete_user(self, user_id):
-        """Delete a user"""
-        self.repository.delete_user(user_id)
-        return {"message": f"User {user_id} deleted successfully"}
+    def list_user_subjects(self, user_id: int):
+        with SessionLocal() as db:
+            repo = UserRepository(db)
+            self._verify_user_exists(repo, user_id)
+            return repo.get_user_subjects(user_id)
 
-# Singleton instance
+    # --- METODI HELPER PRIVATI ---
+    def _verify_user_exists(self, repo: UserRepository, user_id: int):
+        """Metodo di supporto per evitare duplicazioni di codice"""
+        if not repo.get_user_by_id(user_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Utente non trovato"
+            )
+
+
+# Istanza singleton esportata per l'uso nel controller
 user_service = UserService()

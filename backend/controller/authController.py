@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+"""
 from service.authService import auth_service, LoginRequest, RegisterRequest, AuthResponse
 from model.user import User
 
@@ -22,3 +23,4 @@ def logout(user_id: int):
 @authController.post("/refresh")
 def refresh_token(token: str):
   return auth_service.refresh_token(token)
+"""

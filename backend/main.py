@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from controller.artifactController import artifactController
 from database import engine, Base
 
-from controller.authController import authController
+#from controller.authController import authController
 from controller.groupController import groupController
 from controller.materialController import materialController
 from controller.subjectController import subjectController
@@ -31,7 +31,7 @@ app = FastAPI(
 app.root_path = "/api"
 
 # Include routers
-app.include_router(authController)
+#app.include_router(authController)
 app.include_router(groupController)
 app.include_router(materialController)
 app.include_router(subjectController)
