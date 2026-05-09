@@ -24,7 +24,6 @@ function App() {
   return (
     <>
       <Navbar />
-
       <main>
         <Routes>
           {/* Public routes */}
