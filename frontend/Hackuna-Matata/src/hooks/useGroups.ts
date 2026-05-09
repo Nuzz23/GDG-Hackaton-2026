@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GroupAPI } from '../services/api';
+import { groupApi } from '../services/api';
 import type { Group } from '@/types/apiTypes';
 
 export const useGroups = () => {
@@ -11,7 +11,7 @@ export const useGroups = () => {
     const fetchGroups = async () => {
       try {
         setLoading(true);
-        const response = await GroupAPI.list();
+        const response = await groupApi.listGroups();
         setGroups(response.data);
       } catch (err: any) {
         setError(err.response?.data?.msg || 'Failed to fetch groups');

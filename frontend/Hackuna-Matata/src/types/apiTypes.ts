@@ -12,7 +12,7 @@ export interface UserUpdate {
 export interface Group {
   id: number;
   name: string;
-  creationDate: string; // ISO Date string
+  created_at: string; // ISO Date string
   users: number[];
 }
 
@@ -51,4 +51,78 @@ export interface MaterialCreate {
   name: string;
   path: string;
   fileSize: number;
+}
+
+/**
+ * ARTIFACT TYPES
+ */
+export const ArtifactType = {
+  HIGHLIGHT: "highlight",
+  MINDMAP: "mindmap",
+  KEYWORD: "keyword",
+  NOTE: "note",
+  QUESTION: "question",
+} as const;
+
+export type ArtifactType = typeof ArtifactType[keyof typeof ArtifactType];
+
+export interface Artifact {
+  id: number;
+  material_id: number;
+  artifact_type: ArtifactType;
+  page_number?: number | null;
+  content: any; // Struttura JSON flessibile
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface ArtifactCreate {
+  artifact_type: ArtifactType;
+  content: any;
+  page_number?: number;
+}
+
+export interface ArtifactUpdate {
+  content?: any;
+  page_number?: number | null;
+}
+
+// Alias per coerenza con il controller
+export type ArtifactResponse = Artifact;
+
+/**
+ * MISSING SUBJECT TYPES
+ */
+export interface SubjectUpdate {
+  name?: string;
+  deadline?: string;
+  materials?: number[];
+}
+
+/**
+ * MISSING MATERIAL TYPES
+ */
+export interface MaterialUpdate {
+  name?: string;
+  path?: string;
+  fileSize?: number;
+}
+
+/**
+ * MISSING GROUP TYPES
+ */
+export interface GroupUserAdd {
+  group_id: number;
+  user_id: number;
+}
+
+/**
+ * AUTH & GENERIC (Opzionali ma utili)
+ */
+export interface ApiError {
+  detail: {
+    loc: (string | number)[];
+    msg: string;
+    type: string;
+  }[];
 }

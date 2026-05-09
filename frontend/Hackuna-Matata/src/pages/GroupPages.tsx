@@ -2,6 +2,7 @@
 import React from 'react';
 import { useGroups } from '../hooks/useGroups';
 import '@/styles/GroupPage.css';
+import apiClient from '@/services/apiClient';
 
 export const GroupsPage: React.FC = () => {
   const { groups, loading, error } = useGroups();
@@ -21,9 +22,9 @@ export const GroupsPage: React.FC = () => {
           <div key={group.id} className="border p-4 rounded shadow-sm">
             <h2 className="text-xl font-semibold">{group.name}</h2>
             <p className="text-sm text-gray-500">
-              Created on: {new Date(group.creationDate).toLocaleDateString()}
+              Created on: {new Date(group.created_at).toLocaleDateString()}
             </p>
-            <p className="mt-2">Members: {group.users.length}</p>
+            <p className="mt-2">Members: {group.users?.length || 0}</p>
           </div>
         ))}
       </div>

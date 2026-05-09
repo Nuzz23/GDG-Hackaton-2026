@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+/*
 import { AuthAPI } from '@/services/api';
 
 export const useAuth = () => {
@@ -40,3 +41,4 @@ export const useAuth = () => {
 
   return { login, register, logout, loading };
 };
+*/

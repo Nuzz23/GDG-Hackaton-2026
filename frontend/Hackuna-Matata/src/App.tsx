@@ -1,13 +1,14 @@
 import { type JSX } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { LoginPage } from '@/pages/LoginPage';
-import { RegisterPage } from '@/pages/RegisterPage';
+//import { LoginPage } from '@/pages/LoginPage';
+//import { RegisterPage } from '@/pages/RegisterPage';
 import { GroupsPage } from '@/pages/GroupPages';
 import { Navbar } from '@/components/Navbar';
 
 import './App.css';
 
 // Helper protecting routes that require authentication
+/*
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const token = localStorage.getItem('token');
   
@@ -16,27 +17,30 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   }
   return children;
 };
+*/
 
 function App() {
   // Using a state or standard check to determine if user is logged in
-  const isAuthenticated = !!localStorage.getItem('token');
+  const isAuthenticated = true;
+  //!!localStorage.getItem('token');
 
   return (
     <>
       <Navbar />
       <main>
         <Routes>
-          {/* Public routes */}
+          {/* Public routes 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          */}
 
           {/* Protected routes */}
           <Route 
             path="/groups" 
             element={
-              <ProtectedRoute>
+              //<ProtectedRoute>
                 <GroupsPage />
-              </ProtectedRoute>
+              //</ProtectedRoute>
             } 
           />
           
