@@ -1,7 +1,7 @@
 import apiClient from './apiClient';
 import type { 
   User, UserUpdate, Group, GroupCreate, GroupUpdate, 
-  Subject, SubjectCreate, Material, MaterialCreate 
+  Subject, SubjectCreate, Material, /* MaterialCreate */ 
 } from '@/types/apiTypes';
 
 export const AuthAPI = {

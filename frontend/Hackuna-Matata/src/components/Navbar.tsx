@@ -6,9 +6,9 @@ export const Navbar: React.FC = () => {
 
   return (
     <nav>
-      <span>MyApp</span>
+      <span>Braynr</span>
       <button onClick={logout} className="logout-btn">
-        Esci
+        Log out
       </button>
     </nav>
   );
