@@ -1,30 +1,44 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List
+
+class User(BaseModel):
+  id: int
+  username: str
+  email: str
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
 
 userController = APIRouter(
-  prefix="/v1/user",
-  tags=["Users"]
+    prefix="/v1/user",
+    tags=["Users"]
 )
 
-@userController.get("/profile")
+@userController.get("/profile", response_model=User)
 def get_profile(user_id: int):
-  return {
-    "message": f"Profile details for user {user_id}"
-  }
+    return {
+        "id": user_id,
+        "username": "mario_rossi",
+        "email": "mario@example.com",
+    }
 
-@userController.put("/profile")
-def update_profile(user_id: int):
-  return {
-    "message": f"Profile for user {user_id} updated successfully"
-  }
+@userController.patch("/profile", response_model=User)
+def update_profile(user_id: int, user_data: UserUpdate):
+    return {
+        "id": user_id,
+        "username": user_data.username,
+        "email": user_data.email
+    }
 
-@userController.get("/groups")
+@userController.get("/groups", response_model=List[str])
 def list_user_groups(user_id: int):
-  return {
-    "message": f"List of groups for user {user_id}"
-  }
+    return ["admin", "editor"]
 
 @userController.get("/subjects")
 def list_user_subjects(user_id: int):
-  return {
-    "message": f"List of subjects for user {user_id}"
-  }
+    return {
+        "user_id": user_id,
+        "subjects": ["Math", "Science"]
+    }

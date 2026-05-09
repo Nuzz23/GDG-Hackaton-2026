@@ -1,2 +1,4 @@
-fastapi~=0.136.1
+fastapi[standard]
 pydantic
+pydantic[email]
+psycopg2-binary
