@@ -202,7 +202,10 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
           flex: 1, minHeight: 0,
           display: 'grid',
           gridTemplateColumns: '1fr 240px',
-          gap: 16, padding: 16,
+          // Bigger inter-column gap so the right column reads as visually
+          // separated from the center card — matching the breathing room
+          // between the center and the left sidebar.
+          gap: 28, padding: 16,
         }}>
           {/* ── Center: breadcrumb + button + reader ───── */}
           <div style={{
@@ -250,9 +253,31 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
                       />
                     );
                   })}
+                  {/* Eraser — sets the active "color" to transparent so the
+                      reader's execCommand neutralises existing highlights. */}
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickHighlightColor('transparent')}
+                    title="Eraser"
+                    aria-label="Eraser"
+                    style={{
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: 'white',
+                      border: highlightColor === 'transparent' ? '2px solid #234' : '1px solid #c0c4c8',
+                      boxShadow: highlightColor === 'transparent' ? '0 0 0 2px white inset' : 'none',
+                      cursor: 'pointer', padding: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#555" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M16.24 3.56l4.95 4.95c.78.78.78 2.05 0 2.83l-9.2 9.19c-.78.78-2.05.78-2.83 0l-4.95-4.95c-.78-.78-.78-2.05 0-2.83l9.2-9.19c.78-.78 2.05-.78 2.83 0zM4.22 13.78l4.95 4.95H21v2H8.34l-4.12-4.12c-.78-.78-.78-2.05 0-2.83z"/>
+                    </svg>
+                  </button>
                   {highlightColor && (
                     <span style={{ fontSize: 11, color: '#456', marginLeft: 4 }}>
-                      Drag-select to paint
+                      {highlightColor === 'transparent'
+                        ? 'Drag-select to erase'
+                        : 'Drag-select to paint'}
                     </span>
                   )}
                 </div>
@@ -293,30 +318,43 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
               <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Tools</h3>
             </div>
 
-            {/* All three CTAs share the same green pill style (per spec).
-                Active state for Keywords/Highlight is conveyed by the
-                indicators that appear under the breadcrumb header, not by
-                the button color. The first two preserve the live text
-                selection in the reader via onMouseDown→preventDefault. */}
+            {/* Tool grid: 6 light-brown pills in 2 columns + the green
+                Test CTA full-width below. Highlight + Keywords are
+                functional; the other four are placeholders for now (the
+                user wants them visible from the mockup even if not wired
+                up yet). The two functional ones still preserve the live
+                text selection via onMouseDown→preventDefault. */}
             <div style={{
               padding: '0.5rem 0.75rem 0.75rem',
               flexShrink: 0,
               display: 'flex', flexDirection: 'column', gap: 8,
             }}>
-              <button
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={handleKeywordsClick}
-                style={CTA_BUTTON}
-              >
-                Keywords
-              </button>
-              <button
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={toggleHighlightTool}
-                style={CTA_BUTTON}
-              >
-                Highlight
-              </button>
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr 1fr',
+                gap: 8,
+              }}>
+                {/* Row 1 */}
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={toggleHighlightTool}
+                  style={TOOL_BUTTON}
+                >
+                  Highlight
+                </button>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleKeywordsClick}
+                  style={TOOL_BUTTON}
+                >
+                  Keywords
+                </button>
+                {/* Row 2 */}
+                <button style={TOOL_BUTTON}>Study-map</button>
+                <button style={TOOL_BUTTON}>Notes</button>
+                {/* Row 3 */}
+                <button style={TOOL_BUTTON}>Podcast</button>
+                <button style={TOOL_BUTTON}>Image</button>
+              </div>
               <button
                 onClick={onOpenQuiz}
                 disabled={!canOpenQuiz}
@@ -348,11 +386,22 @@ const HIGHLIGHT_COLORS: { name: string; value: string }[] = [
   { name: 'Purple', value: '#d6b3ff' },
 ];
 
-// Shared CTA button style — Keywords / Highlight / Test all use this so the
-// three buttons look identical (per user spec). Per-button overrides (the
-// disabled tint on the Test button) layer on top via spread.
+// Test-my-knowledges CTA — green, full-width, 59px tall.
 const CTA_BUTTON: React.CSSProperties = {
   width: '100%', height: 59, borderRadius: '0.7rem',
   background: '#27ae60', color: 'white', border: 'none',
   fontSize: '1rem', fontWeight: 700, cursor: 'pointer',
+};
+
+// Light-brown pill used for every other Tools button (Highlight, Keywords,
+// Summaries, Questions, Concept maps, Notes). Black text for contrast.
+// The colour is the existing dark brown (rgba(152,76,27)) blended ~50% with
+// white, which lands at roughly #cba58d — visibly the same family but
+// lighter and pleasant under black type.
+const TOOL_BUTTON: React.CSSProperties = {
+  width: '100%', height: 44, borderRadius: '0.7rem',
+  background: '#cba58d', color: '#111', border: 'none',
+  fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
+  padding: '0 8px',
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
 };

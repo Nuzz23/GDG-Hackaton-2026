@@ -207,7 +207,7 @@ export const HomePage: React.FC = () => {
             (Index tree of the currently-open material). The arrow on top
             toggles between the two when a material is open. ───────────── */}
       {!(selectedMaterial && sidebarMode === 'index' && matIndex) ? (
-        <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", height: "92vh", width: "20vw", overflow: "hidden" }}>
+        <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", height: "92vh", width: "20vw", flexShrink: 0, overflow: "hidden", boxSizing: "border-box" }}>
 
           {/* Avatar circle + truncated full name + bell/→ icon. Mirrors the
               "GF Giambattista Fer..." layout from the design mockup. */}
@@ -322,7 +322,7 @@ export const HomePage: React.FC = () => {
         </div>
       ) : (
         // ── Index sidebar: replaces the John Doe panel while reading. ──
-        <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", height: "92vh", width: "20vw", overflow: "hidden" }}>
+        <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "white", display: "flex", flexDirection: "column", height: "92vh", width: "20vw", flexShrink: 0, overflow: "hidden", boxSizing: "border-box" }}>
 
           {/* User header — same as the profile sidebar so the name stays
               visible while reading. The bell here is purely decorative; the
@@ -541,7 +541,7 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "92vh", width: "20vw" }}>
+          <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "92vh", width: "20vw", flexShrink: 0, boxSizing: "border-box" }}>
           </div>
         </>
       )}
