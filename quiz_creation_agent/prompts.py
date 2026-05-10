@@ -5,7 +5,7 @@ Three item types, three prompt families. Every prompt enforces three rules:
 1. Source-grounded only — never introduce facts not in the supplied text.
    The Part 3 brief is explicit: assessment must observe the user's grasp
    of THE source, not the model's general knowledge.
-2. Difficulty calibrated — facile/medio/difficile follow Bloom-style tiers.
+2. Difficulty calibrated — easy/medium/hard follow Bloom-style tiers.
 3. Strict JSON output — no commentary, no markdown fences.
 
 Each prompt has a few-shot block with at least one negative example showing
@@ -18,18 +18,18 @@ from quiz_creation_agent.models import Difficulty
 
 
 _DIFFICULTY_DESCRIPTIONS = {
-    Difficulty.FACILE: (
+    Difficulty.EASY: (
         "Pure recall. Test that the user remembers a definition, a single "
         "stated fact, a name, a date, a formula stated in the source. "
         "Answers should be obvious if the user has read the passage attentively."
     ),
-    Difficulty.MEDIO: (
+    Difficulty.MEDIUM: (
         "Comprehension. Test that the user understands a relation stated in "
         "the source — a cause and its effect, a concept and its example, a "
         "claim and its justification. Answers require connecting two parts "
         "of the passage, not just quoting one line."
     ),
-    Difficulty.DIFFICILE: (
+    Difficulty.HARD: (
         "Synthesis or application. Test that the user can combine multiple "
         "ideas from the source, apply a concept to a new instance discussed "
         "in the source, or compare/contrast two ideas the source presents. "
@@ -81,7 +81,7 @@ JSON only. No commentary, no markdown fences.
 """
 
 
-FLASHCARD_FEWSHOT = """EXAMPLE — facile
+FLASHCARD_FEWSHOT = """EXAMPLE — easy
 
 Source (excerpt):
 "La proprietà di Markov afferma che lo stato successivo di un processo
@@ -150,7 +150,7 @@ JSON only. No commentary, no markdown fences.
 """
 
 
-MCQ_FEWSHOT = """EXAMPLE — medio
+MCQ_FEWSHOT = """EXAMPLE — medium
 
 Source (excerpt):
 "Il teorema di Bayes esprime la probabilità a posteriori P(A|B) come il
@@ -226,7 +226,7 @@ JSON only. No commentary, no markdown fences.
 """
 
 
-OPENQ_FEWSHOT = """EXAMPLE — difficile
+OPENQ_FEWSHOT = """EXAMPLE — hard
 
 Source (excerpt):
 "Il principio di separazione degli accessi distingue tra agenti che leggono
@@ -250,7 +250,7 @@ Correct output:
   }
 ]
 
-WRONG output (yes/no question — too shallow for difficile):
+WRONG output (yes/no question — too shallow for hard):
 [
   {
     "question": "Il reader ha accesso ai sistemi MCP?",
@@ -259,7 +259,7 @@ WRONG output (yes/no question — too shallow for difficile):
   }
 ]
 A binary recall question doesn't test synthesis. Wrong tier — would be
-acceptable at facile, never at difficile.
+acceptable at easy, never at hard.
 
 WRONG output (introduces an outside example):
 [

@@ -7,11 +7,11 @@ Usage examples:
 
   # 3 hard MCQs from a specific section of an index.json
   python -m quiz_creation_agent.cli idx.json --node n_3_2 --type mcq --n 3 \
-      --difficulty difficile -o quiz.json
+      --difficulty hard -o quiz.json
 
   # 4 easy open questions, force English language
   python -m quiz_creation_agent.cli paper.txt --type qa --n 4 \
-      --difficulty facile --lang en -o openq.json
+      --difficulty easy --lang en -o openq.json
 """
 
 from __future__ import annotations
@@ -50,9 +50,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Number of items to generate.",
     )
     parser.add_argument(
-        "--difficulty", default=Difficulty.MEDIO.value,
+        "--difficulty", default=Difficulty.MEDIUM.value,
         choices=[d.value for d in Difficulty],
-        help="Difficulty level. Default: medio.",
+        help="Difficulty level. Default: medium.",
     )
     parser.add_argument(
         "--node", dest="node_id", default=None,

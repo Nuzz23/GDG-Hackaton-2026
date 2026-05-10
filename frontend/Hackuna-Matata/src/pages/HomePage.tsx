@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
 import '../styles/GroupPage.css';
-import { subjectApi, materialApi } from '@/services/api';
+import { subjectApi, materialApi, agentApi } from '@/services/api';
 import type { Subject, Material, IndexOutput, HierarchyNode } from '@/types/apiTypes';
 import { MaterialDetailView } from '@/components/MaterialDetailView';
 import { IndexTree } from '@/components/IndexTree';
@@ -31,6 +31,12 @@ export const HomePage: React.FC = () => {
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
   const [scrollTargetId, setScrollTargetId] = useState<string | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
+
+  // Add-sources flow state. The hidden <input> ref is what the "+ Add sources"
+  // button clicks under the hood; `addingSource` blocks repeat clicks while
+  // the backend is busy indexing + merging.
+  const addSourcesInputRef = useRef<HTMLInputElement>(null);
+  const [addingSource, setAddingSource] = useState(false);
 
   const groupId = 1;
   const userName = "John Doe";
@@ -158,6 +164,26 @@ export const HomePage: React.FC = () => {
     }
   };
 
+  /** Append a new file (PDF / etc.) to the currently-open material's index.
+   *  The backend processes the file and merges its tree as a new chapter at
+   *  the end. We replace the local matIndex with the merged result so the
+   *  sidebar tree, breadcrumb numbering and reader all update at once. */
+  const handleAddSource = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedMaterial) return;
+    setAddingSource(true);
+    try {
+      const r = await agentApi.addSource((selectedMaterial as any).id, file);
+      setMatIndex(r.data.index);
+    } catch (err) {
+      console.error('Add source failed', err);
+    } finally {
+      setAddingSource(false);
+      // Allow re-selecting the same filename right away.
+      if (addSourcesInputRef.current) addSourcesInputRef.current.value = '';
+    }
+  };
+
   const handleUploadNewMaterial = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!selectedSubject) return;
     if (e.target.files && e.target.files.length > 0) {
@@ -183,31 +209,67 @@ export const HomePage: React.FC = () => {
       {!(selectedMaterial && sidebarMode === 'index' && matIndex) ? (
         <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", height: "92vh", width: "20vw", overflow: "hidden" }}>
 
-          <div style={{ width: "100%", padding: "1.5rem 1.5rem 1rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", boxSizing: "border-box" }}>
-            <span style={{ fontWeight: "bold", color: "#333", fontSize: "1.5rem" }}>
-              {userName}
-            </span>
-            {/* When a material is open, show a → arrow to flip the sidebar
-                into Index mode. Otherwise show the bell icon. */}
+          {/* Avatar circle + truncated full name + bell/→ icon. Mirrors the
+              "GF Giambattista Fer..." layout from the design mockup. */}
+          <div style={{ width: "100%", padding: "1.2rem 1.2rem 0.6rem 1.2rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, boxSizing: "border-box" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "#3498db", color: "white", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 700, fontSize: 12,
+              }}>
+                {userInitials(userName)}
+              </div>
+              <span style={{
+                fontWeight: 700, color: "#333", fontSize: "1rem",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }} title={userName}>
+                {userName}
+              </span>
+            </div>
             {selectedMaterial && matIndex ? (
               <button
                 onClick={() => setSidebarMode('index')}
                 title="Show document index"
                 style={{
                   border: "none", background: "transparent", cursor: "pointer",
-                  padding: 4, display: "flex", alignItems: "center",
+                  padding: 4, display: "flex", alignItems: "center", flexShrink: 0,
                 }}
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg">
                   <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/>
                 </svg>
               </button>
             ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer", flexShrink: 0 }}>
                 <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"/>
-                </svg>
+              </svg>
             )}
           </div>
+
+          {/* Back row — appears below the user line. Shows when there's
+              a context to leave (a subject browsed or a material open). */}
+          {(selectedSubject || selectedMaterial) && (
+            <div
+              onClick={() => {
+                if (selectedMaterial) setSelectedMaterial(null);
+                else setSelectedSubject(null);
+              }}
+              style={{
+                width: "100%", padding: "0.4rem 1.2rem",
+                display: "flex", alignItems: "center", gap: 6,
+                cursor: "pointer", color: "#333", fontSize: "0.95rem",
+                fontWeight: 600, boxSizing: "border-box",
+              }}
+              title="Back"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/>
+              </svg>
+              <span>{selectedMaterial ? (selectedSubject?.name ?? 'Subject') : 'Home'}</span>
+            </div>
+          )}
 
           <hr style={{ width: "100%", border: "none", height: "2px", margin: "0", marginBottom: "1rem", background: "rgba(0, 0, 0, 0.1)" }} />
 
@@ -261,7 +323,35 @@ export const HomePage: React.FC = () => {
       ) : (
         // ── Index sidebar: replaces the John Doe panel while reading. ──
         <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", height: "92vh", width: "20vw", overflow: "hidden" }}>
-          <div style={{ width: "100%", padding: "1.2rem 1.2rem 0.8rem 1.2rem", display: "flex", alignItems: "center", justifyContent: "space-between", boxSizing: "border-box" }}>
+
+          {/* User header — same as the profile sidebar so the name stays
+              visible while reading. The bell here is purely decorative; the
+              real "back to profile" affordance is the ← arrow on the row
+              below this. */}
+          <div style={{ width: "100%", padding: "1.2rem 1.2rem 0.6rem 1.2rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, boxSizing: "border-box" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "#3498db", color: "white", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 700, fontSize: 12,
+              }}>
+                {userInitials(userName)}
+              </div>
+              <span style={{
+                fontWeight: 700, color: "#333", fontSize: "1rem",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }} title={userName}>
+                {userName}
+              </span>
+            </div>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer", flexShrink: 0 }}>
+              <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"/>
+            </svg>
+          </div>
+
+          {/* "Back to profile" / Index title row */}
+          <div style={{ width: "100%", padding: "0.4rem 1.2rem 0.6rem", display: "flex", alignItems: "center", justifyContent: "space-between", boxSizing: "border-box" }}>
             <button
               onClick={() => setSidebarMode('profile')}
               title="Back to profile"
@@ -270,14 +360,14 @@ export const HomePage: React.FC = () => {
                 padding: 4, display: "flex", alignItems: "center",
               }}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg">
                 <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/>
               </svg>
             </button>
-            <span style={{ fontWeight: "bold", color: "#333", fontSize: "1.1rem" }}>
+            <span style={{ fontWeight: 700, color: "#333", fontSize: "1.05rem" }}>
               Index
             </span>
-            <span style={{ width: 24 }} />
+            <span style={{ width: 22 }} />
           </div>
 
           <hr style={{ width: "100%", border: "none", height: "2px", margin: "0", marginBottom: "0.5rem", background: "rgba(0, 0, 0, 0.1)" }} />
@@ -293,6 +383,34 @@ export const HomePage: React.FC = () => {
               onSelect={(n) => setScrollTargetId(n.node_id)}
               numbering={numbering}
             />
+          </div>
+
+          {/* "+ Add sources" — appends a new file's index as a new chapter. */}
+          <div style={{
+            padding: "0.6rem 1rem 0.9rem",
+            borderTop: "1px solid rgba(0,0,0,0.08)",
+            flexShrink: 0,
+          }}>
+            <input
+              ref={addSourcesInputRef}
+              type="file"
+              accept=".pdf,.pptx,.md,.markdown,.txt,.mp3,.wav,.m4a,.mp4,.mov"
+              onChange={handleAddSource}
+              style={{ display: "none" }}
+            />
+            <button
+              onClick={() => addSourcesInputRef.current?.click()}
+              disabled={addingSource}
+              style={{
+                width: "100%", padding: "0.7rem", borderRadius: "0.7rem",
+                background: addingSource ? "rgba(152, 76, 27, 0.6)" : "rgba(152, 76, 27)",
+                color: "white", border: "none",
+                fontSize: "0.95rem", fontWeight: 600,
+                cursor: addingSource ? "wait" : "pointer",
+              }}
+            >
+              {addingSource ? "⏳ Adding source…" : "+ Add sources"}
+            </button>
           </div>
         </div>
       )}
@@ -355,7 +473,7 @@ export const HomePage: React.FC = () => {
           <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", height: "92vh", width: "60vw",  boxSizing: "border-box", overflowY: "auto", margin: "0.5rem" }}>
             <h1 style={{ marginBottom: "2rem", color: "#333" }}>{selectedSubject.name}</h1>
 
-            <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem", padding: "0 1rem", boxSizing: "border-box" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <h3 style={{ margin: 0, color: "#555" }}>Materials</h3>
                 <div>
@@ -383,6 +501,7 @@ export const HomePage: React.FC = () => {
                     onClick={() => setSelectedMaterial(material)}
                     style={{
                       padding: "1rem",
+                      margin: "0 1rem",
                       backgroundColor: "white",
                       borderRadius: "0.8rem",
                       boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
@@ -528,3 +647,11 @@ export const HomePage: React.FC = () => {
     </div>
   );
 };
+
+/** "John Doe" → "JD". Falls back to the first 2 chars on single-token names. */
+function userInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}

@@ -23,9 +23,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class Difficulty(str, Enum):
-    FACILE = "facile"
-    MEDIO = "medio"
-    DIFFICILE = "difficile"
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
 
 
 class ItemType(str, Enum):

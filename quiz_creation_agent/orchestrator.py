@@ -23,7 +23,7 @@ def generate_quiz(
     *,
     item_type: ItemType,
     n: int,
-    difficulty: Difficulty = Difficulty.MEDIO,
+    difficulty: Difficulty = Difficulty.MEDIUM,
     node_id: Optional[str] = None,
     language: Optional[str] = None,
     output_path: Optional[str | Path] = None,
@@ -40,7 +40,7 @@ def generate_quiz(
     n:
         How many items to generate. Capped at MAX_N inside the generator.
     difficulty:
-        Difficulty.FACILE / MEDIO / DIFFICILE. Default MEDIO.
+        Difficulty.EASY / MEDIUM / HARD. Default MEDIUM.
     node_id:
         Required when `input_path` is an indexing-agent JSON; ignored otherwise.
     language:

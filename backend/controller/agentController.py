@@ -57,6 +57,19 @@ def get_latest_index(material_id: int):
     return agent_service.get_latest_index(material_id)
 
 
+@agentController.post("/sources")
+def add_source(material_id: int, file: UploadFile = File(...)):
+    """Index a new file and merge its tree into the material's latest index.
+
+    The new content is wrapped in a synthetic chapter and appended at the
+    end of the existing tree, with all node_ids remapped to a unique prefix
+    so they don't collide with the originals. Hierarchical numbering then
+    continues automatically (the new chapter becomes "N+1" since it's just
+    the next sibling at the root level).
+    """
+    return agent_service.add_source(material_id, file)
+
+
 # ---------------------------------------------------------------------------
 # Quiz generation (Part 3a)
 # ---------------------------------------------------------------------------

@@ -118,6 +118,18 @@ export const agentApi = {
       `/v1/material/${materialId}/agent/index`,
     ),
 
+  /** Add another source file to a material — the backend indexes the file
+   *  and merges its tree as a new chapter at the end of the existing index. */
+  addSource: (materialId: number, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post<IndexResponse>(
+      `/v1/material/${materialId}/agent/sources`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
+    );
+  },
+
   /** Generate quiz items from one or more nodes of the latest index.
    *
    * Pass `node_ids: string[]` for multi-section quizzes (the backend will

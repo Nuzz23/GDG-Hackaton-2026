@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { agentApi } from '@/services/api';
 import type { IndexOutput } from '@/types/apiTypes';
 import { MaterialReader } from './MaterialReader';
+import { ChatPanel } from './ChatPanel';
 import { findPath, pathLabels } from '@/utils/treeWalk';
 
 interface MaterialDetailViewProps {
@@ -58,6 +59,48 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
   const [phase, setPhase] = useState<Phase>(index ? 'index_ready' : 'idle');
   const [error, setError] = useState<string | null>(null);
 
+  // ── Reader annotation tools ────────────────────────────────────────────
+  // Highlight: when `highlightOpen` is true, the color toolbar appears below
+  // the breadcrumb. `highlightColor` is the actively-armed color (the one
+  // that will paint the next selection in the reader). Picking the same
+  // color twice unarms it; closing the toolbar also unarms.
+  const [highlightOpen, setHighlightOpen] = useState(false);
+  const [highlightColor, setHighlightColor] = useState<string | null>(null);
+
+  // Keywords: classic "highlighter pen" mode for bold. While ON, single
+  // clicks on a word in the reader bold that word. The button click also
+  // bolds the current selection if one exists, without flipping the mode.
+  const [keywordsMode, setKeywordsMode] = useState(false);
+
+  const toggleHighlightTool = () => {
+    setHighlightOpen((prev) => {
+      const next = !prev;
+      if (!next) setHighlightColor(null); // closing the toolbar disarms
+      return next;
+    });
+  };
+
+  const pickHighlightColor = (color: string) => {
+    setHighlightColor((prev) => (prev === color ? null : color));
+  };
+
+  const handleKeywordsClick = () => {
+    // If the user has a live selection inside the reader, just bold it
+    // without toggling the persistent mode. We use the preserved selection
+    // (the button's onMouseDown→preventDefault keeps it alive). Otherwise
+    // flip the click-to-bold mode.
+    const sel = window.getSelection();
+    const hasSelection = !!(sel && !sel.isCollapsed && sel.toString().trim().length > 0);
+    if (hasSelection) {
+      try {
+        document.execCommand('styleWithCSS', false, 'true');
+        document.execCommand('bold');
+      } catch { /* ignore */ }
+      return;
+    }
+    setKeywordsMode((prev) => !prev);
+  };
+
   // On mount (or when materialId changes) try to load an existing index.
   // If HomePage already has it cached we skip the fetch.
   useEffect(() => {
@@ -108,20 +151,6 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
       width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
       boxSizing: 'border-box', background: '#fafbfc',
     }}>
-      {/* Top bar */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '14px 24px', borderBottom: '1px solid #e6e8eb', background: 'white',
-      }}>
-        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>📚 {materialName}</h2>
-        <button onClick={onBack} style={{
-          padding: '6px 12px', cursor: 'pointer',
-          border: '1px solid #ccc', background: 'white', borderRadius: 4,
-        }}>
-          ← Back
-        </button>
-      </div>
-
       {error && (
         <div style={{
           padding: 12, background: '#fdebee', borderLeft: '4px solid #c0392b',
@@ -189,6 +218,46 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
               }}>
                 {breadcrumb.length > 0 ? breadcrumb.join(' › ') : '—'}
               </div>
+
+              {/* Color toolbar — visible only when the Highlight tool is open. */}
+              {highlightOpen && (
+                <div style={{
+                  marginTop: 10, display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <span style={{ fontSize: 11, color: '#789' }}>Highlighter:</span>
+                  {HIGHLIGHT_COLORS.map((c) => {
+                    const active = highlightColor === c.value;
+                    return (
+                      <button
+                        key={c.value}
+                        // Prevent the button from stealing focus / killing the
+                        // current text selection in the reader.
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => pickHighlightColor(c.value)}
+                        title={c.name}
+                        aria-label={c.name}
+                        style={{
+                          width: 22, height: 22, borderRadius: '50%',
+                          background: c.value,
+                          border: active ? '2px solid #234' : '1px solid #c0c4c8',
+                          boxShadow: active ? '0 0 0 2px white inset' : 'none',
+                          cursor: 'pointer', padding: 0,
+                        }}
+                      />
+                    );
+                  })}
+                  {highlightColor && (
+                    <span style={{ fontSize: 11, color: '#456', marginLeft: 4 }}>
+                      Drag-select to paint
+                    </span>
+                  )}
+                </div>
+              )}
+              {keywordsMode && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#456' }}>
+                  ✏️ Keywords: click any word to toggle bold. Click the button again to exit.
+                </div>
+              )}
             </div>
 
             {/* Reader */}
@@ -197,51 +266,65 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
                 tree={index.tree}
                 onCurrentNodeChange={onCurrentNodeChange}
                 scrollToNodeId={scrollTargetId}
+                highlightColor={highlightColor}
+                keywordsMode={keywordsMode}
+                materialId={materialId}
               />
             </div>
           </div>
 
-          {/* ── Right: Session side panel (with quiz CTA at the bottom) ── */}
+          {/* ── Right column: Chat (top, collapsible) + Tools (bottom) ── */}
           <div style={{
-            background: 'white', border: '1px solid #e6e8eb', borderRadius: 10,
-            display: 'flex', flexDirection: 'column', minHeight: 0,
+            display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0,
           }}>
-            <div style={{ padding: 14, overflowY: 'auto', flex: 1, minHeight: 0 }}>
-              <h3 style={{ marginTop: 0, fontSize: '0.95rem' }}>Session</h3>
-              <p style={{ fontSize: 12, color: '#789', lineHeight: 1.5 }}>
-                Scroll through the material — the breadcrumb above and the
-                index on the left both track your position.
-              </p>
-              <div style={{
-                marginTop: 16, padding: 10, background: '#f5f8fb',
-                borderRadius: 6, fontSize: 11, color: '#456',
-              }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>Tip</div>
-                The quiz scope defaults to the section currently in view.
-                The button below opens a popup where you can also pick a
-                different section, a paragraph, or the whole document.
-              </div>
+            <ChatPanel />
+
+            {/* ── Tools / Session panel (with quiz CTA at the bottom) ── */}
+            <div style={{
+              background: 'white', border: '1px solid #e6e8eb', borderRadius: 10,
+              display: 'flex', flexDirection: 'column', minHeight: 0,
+              flex: '0 0 auto',
+            }}>
+            <div style={{ padding: '14px 14px 4px', flexShrink: 0 }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Tools</h3>
             </div>
 
-            {/* Sticky bottom CTA — almost as wide as the panel, height 59px. */}
+            {/* All three CTAs share the same green pill style (per spec).
+                Active state for Keywords/Highlight is conveyed by the
+                indicators that appear under the breadcrumb header, not by
+                the button color. The first two preserve the live text
+                selection in the reader via onMouseDown→preventDefault. */}
             <div style={{
               padding: '0.5rem 0.75rem 0.75rem',
-              borderTop: '1px solid rgba(0,0,0,0.08)',
               flexShrink: 0,
+              display: 'flex', flexDirection: 'column', gap: 8,
             }}>
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleKeywordsClick}
+                style={CTA_BUTTON}
+              >
+                Keywords
+              </button>
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={toggleHighlightTool}
+                style={CTA_BUTTON}
+              >
+                Highlight
+              </button>
               <button
                 onClick={onOpenQuiz}
                 disabled={!canOpenQuiz}
                 style={{
-                  width: '100%', height: 59, borderRadius: '0.7rem',
+                  ...CTA_BUTTON,
                   background: canOpenQuiz ? '#27ae60' : '#a8c9b3',
-                  color: 'white', border: 'none',
-                  fontSize: '1rem', fontWeight: 700,
                   cursor: canOpenQuiz ? 'pointer' : 'not-allowed',
                 }}
               >
                 Test my knowledges
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -250,3 +333,22 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
     </div>
   );
 }
+
+// Highlighter palette — soft pastel tints so dark text stays legible on top.
+// Order matches the user's spec: red, yellow, green, blue, purple.
+const HIGHLIGHT_COLORS: { name: string; value: string }[] = [
+  { name: 'Red',    value: '#fab1a0' },
+  { name: 'Yellow', value: '#ffeaa7' },
+  { name: 'Green',  value: '#b8e994' },
+  { name: 'Blue',   value: '#a8d5ff' },
+  { name: 'Purple', value: '#d6b3ff' },
+];
+
+// Shared CTA button style — Keywords / Highlight / Test all use this so the
+// three buttons look identical (per user spec). Per-button overrides (the
+// disabled tint on the Test button) layer on top via spread.
+const CTA_BUTTON: React.CSSProperties = {
+  width: '100%', height: 59, borderRadius: '0.7rem',
+  background: '#27ae60', color: 'white', border: 'none',
+  fontSize: '1rem', fontWeight: 700, cursor: 'pointer',
+};

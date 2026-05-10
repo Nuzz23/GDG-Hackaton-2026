@@ -163,6 +163,124 @@ class AgentService:
             return 1 if node.get("kind") == "paragraph" else 0
         return sum(AgentService._count_leaves(c) for c in children)
 
+    def add_source(self, material_id: int, file: UploadFile) -> dict[str, Any]:
+        """Index `file` and append its tree as a new chapter onto the
+        material's latest INDEX artifact.
+
+        Steps:
+          1. Persist the upload to disk (kept around so quiz generation on
+             merged subtrees can re-resolve source paths if it ever needs to).
+          2. Run processing_agent on it to get a standalone IndexOutput.
+          3. Remap node_ids in the new tree under a unique `s<N>_` prefix
+             so they never collide with existing ids.
+          4. Wrap the new tree's children in a synthetic chapter labelled
+             after the uploaded filename — per spec, additions always start
+             a new chapter at the root level.
+          5. Append the chapter to the existing tree's children. Hierarchical
+             numbering picks it up automatically (it's just the next sibling).
+          6. Persist the merged payload as a new INDEX artifact for the same
+             material and return it.
+        """
+        # 1. Save the upload under a stable path.
+        target_dir = os.path.join("uploads", "material_sources", f"material_{material_id}")
+        os.makedirs(target_dir, exist_ok=True)
+        safe_name = (file.filename or "source.pdf").replace(" ", "_")
+        target = os.path.join(target_dir, f"{uuid.uuid4().hex[:8]}_{safe_name}")
+        with open(target, "wb") as f:
+            file.file.seek(0)
+            f.write(file.file.read())
+        file.file.close()
+
+        # 2. Index the new file standalone.
+        index_document = _processing_agent()
+        try:
+            new_payload = index_document(target)
+        except Exception as e:
+            logger.exception("[add_source] processing_agent failed")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Indexing the new source failed: {str(e)[:300]}",
+            )
+
+        # 3-5. Merge into the existing INDEX.
+        existing_payload = self._latest_index_payload(material_id)
+        source_label = Path(file.filename or "Additional source").stem or "Additional source"
+        merged = self._merge_indexes(existing_payload, new_payload, source_label)
+
+        # 6. Persist as a new INDEX artifact (we don't mutate the previous one).
+        with SessionLocal() as db:
+            artifact = ArtifactRepository.create_artifact(
+                db=db,
+                material_id=material_id,
+                artifact_type=ArtifactType.INDEX,
+                content=merged,
+            )
+            return {
+                "artifact_id": artifact.id,
+                "material_id": material_id,
+                "index": merged,
+            }
+
+    @staticmethod
+    def _merge_indexes(existing: dict, new: dict, source_label: str) -> dict:
+        """Append `new`'s tree into `existing`'s tree as a wrapped chapter.
+
+        Mutates `existing` in place and returns it (the caller treats the
+        return as the new payload). `new` is also mutated (node_ids are
+        remapped); since it isn't reused after merging, that's fine.
+        """
+        # Find the next free `s<N>_` prefix by scanning existing ids.
+        used: set[int] = set()
+
+        def collect(node: dict) -> None:
+            nid = node.get("node_id") or ""
+            if nid.startswith("s"):
+                head = nid.split("_", 1)[0]  # "s2"
+                try:
+                    used.add(int(head[1:]))
+                except (ValueError, IndexError):
+                    pass
+            for c in node.get("children", []) or []:
+                collect(c)
+
+        collect(existing.get("tree", {}))
+        next_idx = (max(used) + 1) if used else 1
+        prefix = f"s{next_idx}_"
+
+        def remap(node: dict) -> None:
+            nid = node.get("node_id")
+            if nid:
+                node["node_id"] = prefix + nid
+            for c in node.get("children", []) or []:
+                remap(c)
+
+        new_tree = new.get("tree", {}) or {}
+        remap(new_tree)
+
+        # The user spec says additions always start a new chapter at the
+        # root, so we wrap the appended subtree even if it already starts
+        # with chapters — the outer wrapper makes the boundary visible.
+        wrapper = {
+            "node_id": f"{prefix}root",
+            "kind": "chapter",
+            "label": source_label,
+            "children": new_tree.get("children", []) or [],
+        }
+
+        existing_tree = existing.setdefault("tree", {})
+        existing_tree.setdefault("children", []).append(wrapper)
+
+        # Record the merge so the UI / future calls can show provenance.
+        src = existing.setdefault("source", {})
+        merged_list = src.setdefault("merged_sources", [])
+        merged_list.append({
+            "filename": (new.get("source") or {}).get("filename"),
+            "language": (new.get("source") or {}).get("language"),
+            "prefix": prefix,
+        })
+
+        return existing
+
     def get_latest_index(self, material_id: int) -> dict[str, Any]:
         """Return the most recent INDEX artifact for a material, if any."""
         with SessionLocal() as db:
