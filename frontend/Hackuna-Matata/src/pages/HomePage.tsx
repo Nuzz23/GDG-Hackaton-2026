@@ -13,7 +13,7 @@ export const HomePage: React.FC = () => {
   const [materials, setMaterials] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  
+
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [subjectMaterials, setSubjectMaterials] = useState<Material[]>([]);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -33,6 +33,19 @@ export const HomePage: React.FC = () => {
 
   useEffect(() => {
     fetchSubjects();
+  }, []);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedSubject(null);
+        setSelectedMaterial(null);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+    };
   }, []);
 
   const togglePopup = () => {
@@ -64,19 +77,19 @@ export const HomePage: React.FC = () => {
 
   const handleConfirm = async () => {
     if (!subjectName) return;
-    
+
     setIsSubmitting(true);
     try {
       const subjectData = {
         name: subjectName,
-        description: "", 
+        description: "",
       };
 
       const subjectResponse = await subjectApi.createSubject(groupId, subjectData as any);
       const newSubjectId = (subjectResponse as any).data?.id || (subjectResponse as any).id;
 
       if (newSubjectId && materials.length > 0) {
-        const uploadPromises = materials.map(file => 
+        const uploadPromises = materials.map(file =>
           materialApi.uploadMaterial(groupId, file, file.name, newSubjectId)
         );
         await Promise.all(uploadPromises);
@@ -93,11 +106,9 @@ export const HomePage: React.FC = () => {
 
   const handleSubjectClick = async (subject: Subject) => {
     setSelectedSubject(subject);
-    setSelectedMaterial(null);  // close any open material when switching subjects
+    setSelectedMaterial(null);
     setIsLoadingDetails(true);
     try {
-      // Use the dedicated list endpoint — `subject.materials` from getSubject
-      // is the unloaded SQLAlchemy relationship and arrives empty.
       const res = await materialApi.listBySubject(groupId, subject.id);
       const data = (res as any).data || res;
       setSubjectMaterials(Array.isArray(data) ? data : []);
@@ -127,16 +138,23 @@ export const HomePage: React.FC = () => {
 
   return (
     <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", position: "relative" }}>
-      
-      <div style={{border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin:"0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", height: "92vh", width: "20vw", overflow: "hidden" }}>
+
+      <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", height: "92vh", width: "20vw", overflow: "hidden" }}>
+
+        <div style={{ width: "100%", padding: "1.5rem 1.5rem 1rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", boxSizing: "border-box" }}>
+          <span style={{ fontWeight: "bold", color: "#333", fontSize: "1.5rem" }}>
+            {userName}
+          </span>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer" }}>
+            <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"/>
+          </svg>
+        </div>
         
-        <button style={{marginTop: "1rem", marginBottom: "1rem", flexShrink: 0}} onClick={togglePopup}>
-            Create new study session
-        </button>
-        
+        <hr style={{ width: "100%", border: "none", height: "2px", margin: "0", marginBottom: "1rem", background: "rgba(0, 0, 0, 0.1)" }} />
+
         <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", flex: 1, overflowY: "auto", paddingBottom: "1rem" }}>
           {subjects.map((subject) => (
-            <div 
+            <div
               key={subject.id}
               onClick={() => handleSubjectClick(subject)}
               style={{
@@ -160,10 +178,6 @@ export const HomePage: React.FC = () => {
             </div>
           ))}
         </div>
-
-        <div style={{ width: "100%", padding: "1.5rem 0", background: "#f0f0f0", textAlign: "center", fontWeight: "bold", marginTop: "auto", flexShrink: 0, borderBottomLeftRadius: "1.2rem", borderBottomRightRadius: "1.2rem" }}>
-          {userName}
-        </div>
       </div>
 
       {!selectedSubject ? (
@@ -179,10 +193,23 @@ export const HomePage: React.FC = () => {
           height: "92vh",
           width: "78vw"
         }}>
-          <h2>Choose a subject to start</h2>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center"}}>
+            <h2 style={{ fontSize: "2.5rem", fontWeight: "bold", textAlign: "left", lineHeight: "1.2", marginBottom: "0.8rem", color: "#333" }}>
+              Hi {userName}!<br />
+              What are we learning today?
+            </h2>
+
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center"}}>
+              <button style={{ width: "16rem", height: "3rem", marginRight: "1rem", borderRadius: "0.8rem", background: "rgba(152, 76, 27)", color: "white", border: "none", fontSize: "1.2rem", cursor: "pointer" }} onClick={togglePopup}>
+                Create new study session
+              </button>
+              <button style={{ width: "16rem", height: "3rem", borderRadius: "0.8rem", background: "white", color: "black", border: "1px solid #ccc", fontSize: "1.2rem", cursor: "pointer" }} onClick={togglePopup}>
+                Join a study session
+              </button>
+            </div>
+          </div>
         </div>
       ) : selectedMaterial ? (
-        // ─── A material is open: AI flow takes over the right pane ───
         <div style={{
           border: "1px solid rgba(0, 0, 0, 0.1)",
           borderRadius: "1.2rem",
@@ -201,7 +228,7 @@ export const HomePage: React.FC = () => {
         </div>
       ) : (
         <>
-          <div style={{border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", height: "92vh", width: "60vw", padding: "2rem", boxSizing: "border-box", overflowY: "auto" }}>
+          <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", height: "92vh", width: "60vw",  boxSizing: "border-box", overflowY: "auto", margin: "0.5rem" }}>
             <h1 style={{ marginBottom: "2rem", color: "#333" }}>{selectedSubject.name}</h1>
 
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -258,10 +285,11 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "92vh", width: "20vw" }}>
+          <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "92vh", width: "20vw" }}>
           </div>
         </>
       )}
+      
 
       {isPopupOpen && (
         <div style={{
@@ -276,7 +304,7 @@ export const HomePage: React.FC = () => {
           justifyContent: "center",
           zIndex: 1000
         }}>
-          
+
           <div style={{
             background: "white",
             padding: "2rem",
@@ -291,7 +319,7 @@ export const HomePage: React.FC = () => {
             gap: "1rem"
           }}>
             <h2>New Study Session</h2>
-            
+
             <input
               type="text"
               placeholder="Subject Name"
@@ -348,7 +376,7 @@ export const HomePage: React.FC = () => {
                 </div>
               )}
             </div>
-            
+
             <div style={{ display: "flex", gap: "1rem", marginTop: "1.5rem" }}>
               <button onClick={togglePopup} disabled={isSubmitting} style={{ padding: "0.5rem 1rem", cursor: "pointer" }}>
                 Cancel
@@ -358,7 +386,7 @@ export const HomePage: React.FC = () => {
               </button>
             </div>
           </div>
-          
+
         </div>
       )}
 
