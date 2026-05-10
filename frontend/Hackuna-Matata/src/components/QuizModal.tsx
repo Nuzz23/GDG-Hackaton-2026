@@ -67,6 +67,21 @@ export function QuizModal({ isOpen, onClose, materialId, tree, targetNode }: Qui
     }
   }, [isOpen, targetNode?.node_id, tree?.node_id]);
 
+  // While the modal is open, lock background interaction:
+  //   - body scroll off (prevents wheel/touch from scrolling the page)
+  //   - blur whatever was focused (otherwise the reader's contentEditable
+  //     keeps catching keyboard arrows / page-down behind the popup)
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const active = document.activeElement as HTMLElement | null;
+    if (active && typeof active.blur === 'function') active.blur();
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   /**
@@ -131,6 +146,11 @@ export function QuizModal({ isOpen, onClose, materialId, tree, targetNode }: Qui
   return (
     <div
       onClick={onClose}
+      // Block wheel / touch scroll from chaining to whatever sits below the
+      // backdrop (the reader's own scroll container, the body, …). The card
+      // inside has its own overflow so users can still scroll the form.
+      onWheel={(e) => e.preventDefault()}
+      onTouchMove={(e) => e.preventDefault()}
       style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -139,10 +159,17 @@ export function QuizModal({ isOpen, onClose, materialId, tree, targetNode }: Qui
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        // Stop our backdrop's onWheel preventDefault from killing scroll
+        // INSIDE the modal — the card needs its own scroll to work.
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
         style={{
           background: 'white', borderRadius: 12,
           width: 'min(720px, 92vw)', maxHeight: '88vh',
           overflowY: 'auto',
+          // Contain scroll-chain so reaching the top/bottom of the card
+          // doesn't bleed into any scrollable ancestor.
+          overscrollBehavior: 'contain',
           boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
           padding: 24, boxSizing: 'border-box',
           display: 'flex', flexDirection: 'column', gap: 16,

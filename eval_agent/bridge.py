@@ -39,9 +39,16 @@ def from_quiz_item(quiz_item: Any, *, language: str) -> AssessmentItem:
     """Convert a single quiz_creation_agent item to an `AssessmentItem`.
 
     Accepts either a Pydantic `FlashcardItem` / `MCQItem` / `OpenQuestionItem`
-    (from `quiz_creation_agent.models`) or a dict-shaped equivalent. Raises
-    if the item lacks a `node_id` in its source — `eval_agent` requires
-    `node_id` for source-redirection on errors and refuses items without it.
+    (from `quiz_creation_agent.models`) or a dict-shaped equivalent.
+
+    `node_id` is the link the eval agent uses for source-redirection. When
+    a quiz was generated from a single node (the default path) it's there;
+    when it was generated from a multi-node selection or raw text (the
+    "Test on multiple sections" / "All document" UI flows) the source has
+    no single node to point at. In that case we fall back to a synthetic
+    id derived from the item itself — eval still works, but source-redirect
+    interventions degrade to a generic "go back and re-read" hint instead
+    of jumping to a specific paragraph.
     """
     d = _to_dict(quiz_item)
 
@@ -50,13 +57,7 @@ def from_quiz_item(quiz_item: Any, *, language: str) -> AssessmentItem:
         raise ValueError(f"Unknown quiz item_type: {item_type_str!r}")
 
     source = d.get("source") or {}
-    node_id = source.get("node_id")
-    if not node_id:
-        raise ValueError(
-            f"Quiz item {d.get('item_id')!r} has no node_id in its source. "
-            "AssessmentItem requires node_id for source-redirection on errors. "
-            "Re-generate from an index.json + --node, not from raw text."
-        )
+    node_id = source.get("node_id") or f"merged:{d.get('item_id', 'unknown')}"
 
     common = dict(
         assessment_id=d["item_id"],
