@@ -85,10 +85,15 @@ class AgentService:
         """Run processing_agent on the material's stored file. Persist the
         IndexOutput as an INDEX artifact and return the payload + artifact id.
 
-        If a previous INDEX artifact exists for this material, we keep it
-        (history) but the latest is what callers should display. The
-        controller can choose to delete prior INDEX artifacts if desired.
+        Logs progress to stdout so the user can see what's happening. The
+        first call on a cold process pays the cost of importing langgraph,
+        building the lingua language-detection models, and compiling the
+        graph — typically 30-60 seconds on a laptop. Subsequent calls reuse
+        the cached graph and complete in seconds for PDFs.
         """
+        import time
+        t0 = time.perf_counter()
+
         with SessionLocal() as db:
             material = MaterialRepository.get_material_by_id(db, group_id, material_id)
             if not material:
@@ -103,16 +108,32 @@ class AgentService:
                     detail=f"Material file is missing on disk at {file_path}",
                 )
 
+        logger.info(
+            "[indexing] START material_id=%s file=%s size=%s bytes",
+            material_id, file_path,
+            os.path.getsize(file_path) if os.path.isfile(file_path) else "?",
+        )
+
         # Out-of-DB heavy work (no DB session held while the agent runs)
         index_document = _processing_agent()
+        logger.info("[indexing] processing_agent imported (t+%.1fs)", time.perf_counter() - t0)
+
         try:
             payload = index_document(file_path)
         except Exception as e:
-            logger.exception("Indexing agent failed")
+            logger.exception("[indexing] FAILED material_id=%s after %.1fs",
+                             material_id, time.perf_counter() - t0)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Indexing failed: {str(e)[:300]}",
             )
+
+        logger.info(
+            "[indexing] DONE material_id=%s in %.1fs — language=%s, leaves=%s",
+            material_id, time.perf_counter() - t0,
+            payload.get("source", {}).get("language"),
+            self._count_leaves(payload.get("tree", {})),
+        )
 
         with SessionLocal() as db:
             artifact = ArtifactRepository.create_artifact(
@@ -126,6 +147,15 @@ class AgentService:
                 "material_id": material_id,
                 "index": payload,
             }
+
+    @staticmethod
+    def _count_leaves(node: dict) -> int:
+        if not isinstance(node, dict):
+            return 0
+        children = node.get("children") or []
+        if not children:
+            return 1 if node.get("kind") == "paragraph" else 0
+        return sum(AgentService._count_leaves(c) for c in children)
 
     def get_latest_index(self, material_id: int) -> dict[str, Any]:
         """Return the most recent INDEX artifact for a material, if any."""
@@ -155,7 +185,7 @@ class AgentService:
         node_id: str,
         item_type: str,
         n: int,
-        difficulty: str = "medio",
+        difficulty: str = "medium",
     ) -> dict[str, Any]:
         """Generate quiz items for a node of the latest INDEX artifact.
 

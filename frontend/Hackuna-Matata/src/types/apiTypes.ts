@@ -191,7 +191,7 @@ export interface IndexOutput {
 // ───── quiz_creation_agent / QuizOutput ─────
 
 export type ItemTypeCode = "f" | "mcq" | "qa";
-export type Difficulty = "facile" | "medio" | "difficile";
+export type Difficulty = "easy" | "medium" | "hard";
 
 export interface QuizSourceRef {
   source_filename: string;

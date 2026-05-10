@@ -63,7 +63,13 @@ export const materialApi = {
     });
   },
 
-  getMaterial: (groupId: number, materialId: number) => 
+  /** List all materials for a subject (within a group). */
+  listBySubject: (groupId: number, subjectId: number) =>
+    apiClient.get<Material[]>('/v1/material/list', {
+      params: { group_id: groupId, subject_id: subjectId },
+    }),
+
+  getMaterial: (groupId: number, materialId: number) =>
     apiClient.get<Material>(`/v1/material/${materialId}`, { params: { group_id: groupId } }),
 
   updateMaterial: (groupId: number, materialId: number, data: any) => 

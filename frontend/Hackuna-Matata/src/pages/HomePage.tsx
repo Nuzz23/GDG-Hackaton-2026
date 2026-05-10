@@ -1,5 +1,5 @@
-import React, { useState, useEffect, DragEvent, ChangeEvent } from 'react';
-import { useGroups } from '../hooks/useGroups';
+import { useState, useEffect } from 'react';
+import type { DragEvent, ChangeEvent } from 'react';
 import '../styles/GroupPage.css';
 import { subjectApi, materialApi } from '@/services/api';
 import type { Subject, Material } from '@/types/apiTypes';
@@ -93,26 +93,14 @@ export const HomePage: React.FC = () => {
 
   const handleSubjectClick = async (subject: Subject) => {
     setSelectedSubject(subject);
+    setSelectedMaterial(null);  // close any open material when switching subjects
     setIsLoadingDetails(true);
     try {
-      const response = await subjectApi.getSubject(groupId, subject.id);
-      const subjectData = (response as any).data || response;
-      const materialRefs = subjectData.materials || [];
-
-      const detailedMaterials = await Promise.all(
-        materialRefs.map(async (mat: any) => {
-          const matId = mat.id || mat;
-          try {
-            const res = await materialApi.getMaterial(groupId, matId);
-            return (res as any).data || res;
-          } catch (err) {
-            console.error(err);
-            return mat;
-          }
-        })
-      );
-
-      setSubjectMaterials(detailedMaterials);
+      // Use the dedicated list endpoint — `subject.materials` from getSubject
+      // is the unloaded SQLAlchemy relationship and arrives empty.
+      const res = await materialApi.listBySubject(groupId, subject.id);
+      const data = (res as any).data || res;
+      setSubjectMaterials(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
       setSubjectMaterials([]);

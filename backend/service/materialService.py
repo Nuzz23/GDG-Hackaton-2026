@@ -78,6 +78,19 @@ class MaterialService:
                 )
             return material
 
+    def list_materials_by_subject(self, group_id: int, subject_id: int):
+        """List all materials of a subject (verified to belong to the group)."""
+        with SessionLocal() as db:
+            subject = SubjectRepository.get_subject_by_id(
+                db=db, group_id=group_id, subject_id=subject_id
+            )
+            if not subject:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Materia non trovata o non appartenente a questo gruppo.",
+                )
+            return MaterialRepository.get_materials_by_subject(db, group_id, subject_id)
+
     def update_material(self, group_id: int, material_id: int, material_update: MaterialUpdate):
         with SessionLocal() as db:
             updated_material = MaterialRepository.update_material(

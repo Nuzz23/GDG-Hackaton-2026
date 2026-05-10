@@ -34,6 +34,14 @@ class MaterialRepository:
         ).first()
 
     @staticmethod
+    def get_materials_by_subject(db: Session, group_id: int, subject_id: int) -> List[MaterialModel]:
+        """List all materials for a subject, gated by group ownership."""
+        return db.query(MaterialModel).join(SubjectModel).filter(
+            MaterialModel.subject_id == subject_id,
+            SubjectModel.group_id == group_id,
+        ).order_by(MaterialModel.uploaded_at.desc()).all()
+
+    @staticmethod
     def update_material(db: Session, group_id: int, material_id: int,
                         name: Optional[str] = None,
                         path: Optional[str] = None,

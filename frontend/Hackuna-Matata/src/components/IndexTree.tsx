@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { HierarchyNode } from '@/types/apiTypes';
+import { nodeTitle } from '@/utils/nodeTitle';
 
 interface IndexTreeProps {
   node: HierarchyNode;
@@ -70,7 +71,7 @@ export function IndexTree({ node, depth = 0, selectedNodeId, onSelect }: IndexTr
           }}>
             [{node.kind}]
           </span>
-          {node.label || (node.text ? node.text.slice(0, 60).replace(/\n/g, ' ') + '…' : '<leaf>')}
+          {nodeTitle(node)}
         </span>
       </div>
       {expanded && !isLeaf && (

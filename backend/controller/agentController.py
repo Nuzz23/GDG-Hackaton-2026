@@ -66,7 +66,7 @@ class QuizRequest(BaseModel):
     node_id: str
     item_type: str  # "f" | "mcq" | "qa"
     n: int
-    difficulty: str = "medio"  # "facile" | "medio" | "difficile"
+    difficulty: str = "medium"  # "easy" | "medium" | "hard"
 
 
 @agentController.post("/quiz")

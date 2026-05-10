@@ -5,6 +5,7 @@ import type {
 } from '@/types/apiTypes';
 import { IndexTree } from './IndexTree';
 import { QuizPlayer } from './QuizPlayer';
+import { nodeTitle } from '@/utils/nodeTitle';
 
 interface MaterialDetailViewProps {
   groupId: number;
@@ -36,7 +37,7 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
   // Form for quiz generation
   const [itemType, setItemType] = useState<ItemTypeCode>('qa');
   const [n, setN] = useState<number>(3);
-  const [difficulty, setDifficulty] = useState<Difficulty>('medio');
+  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
 
   // On mount, try to load an existing index for this material
   useEffect(() => {
@@ -183,12 +184,12 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
             ) : (
               <>
                 <div style={{ marginBottom: 16, padding: 10, background: '#e8f4fd', borderRadius: 4 }}>
-                  <div style={{ fontSize: 12, color: '#555' }}>Selected node:</div>
+                  <div style={{ fontSize: 12, color: '#555' }}>Selected:</div>
                   <div style={{ fontWeight: 'bold' }}>
-                    [{selectedNode.kind}] {selectedNode.label || '<paragraph>'}
+                    {nodeTitle(selectedNode, 80)}
                   </div>
-                  <div style={{ fontSize: 11, color: '#888', fontFamily: 'monospace' }}>
-                    {selectedNode.node_id}
+                  <div style={{ fontSize: 11, color: '#888', textTransform: 'capitalize' }}>
+                    {selectedNode.kind}
                   </div>
                 </div>
 
@@ -212,9 +213,9 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
                     onChange={(e) => setDifficulty(e.target.value as Difficulty)}
                     style={{ width: '100%', padding: 8, fontSize: 14 }}
                   >
-                    <option value="facile">Facile</option>
-                    <option value="medio">Medio</option>
-                    <option value="difficile">Difficile</option>
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
                   </select>
                 </div>
 
@@ -252,7 +253,7 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
         <div>
           <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, color: '#666' }}>
-              Quiz on: <b>{selectedNode?.label || selectedNode?.node_id}</b> ·{' '}
+              Quiz on: <b>{selectedNode ? nodeTitle(selectedNode, 50) : '—'}</b> ·{' '}
               {quiz.n_produced} {quiz.item_type} · {quiz.difficulty}
             </span>
             <button onClick={restart} style={{ padding: '4px 10px', cursor: 'pointer' }}>
