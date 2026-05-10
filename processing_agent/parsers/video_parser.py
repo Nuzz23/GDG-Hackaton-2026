@@ -17,8 +17,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from agent.parsers.audio_parser import parse as parse_audio_internal
-from agent.models import Document, SourceType
+from processing_agent.parsers.audio_parser import parse as parse_audio_internal
+from processing_agent.models import Document, SourceType
 
 logger = logging.getLogger(__name__)
 

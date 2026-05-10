@@ -27,7 +27,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from agent.aggregate_models import (
+from processing_agent.aggregate_models import (
     AggregateMetadata,
     AggregateNode,
     AggregateNodeKind,
@@ -36,9 +36,9 @@ from agent.aggregate_models import (
     OrganizingPrinciple,
     SourceSummary,
 )
-from agent.llm import call_json
-from agent.models import IndexOutput
-from agent.prompts import (
+from processing_agent.llm import call_json
+from processing_agent.models import IndexOutput
+from processing_agent.prompts import (
     AGGREGATION_FEWSHOT,
     AGGREGATION_SYSTEM,
     aggregation_user_prompt,

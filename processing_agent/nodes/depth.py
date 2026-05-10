@@ -22,8 +22,8 @@ from __future__ import annotations
 import logging
 from typing import Iterable
 
-from agent.models import HierarchyNode, NodeKind
-from agent.state import IndexingState
+from processing_agent.models import HierarchyNode, NodeKind
+from processing_agent.state import IndexingState
 
 logger = logging.getLogger(__name__)
 

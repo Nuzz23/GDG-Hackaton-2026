@@ -18,15 +18,15 @@ import logging
 from typing import Optional
 from uuid import uuid4
 
-from agent.llm import call_json
-from agent.models import (
+from processing_agent.llm import call_json
+from processing_agent.models import (
     HierarchyNode,
     NodeKind,
     SemanticParagraph,
     union_locators,
 )
-from agent.prompts import CLUSTERING_SYSTEM, clustering_user_prompt
-from agent.state import IndexingState
+from processing_agent.prompts import CLUSTERING_SYSTEM, clustering_user_prompt
+from processing_agent.state import IndexingState
 
 logger = logging.getLogger(__name__)
 

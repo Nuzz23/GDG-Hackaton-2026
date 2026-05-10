@@ -25,7 +25,7 @@ import statistics
 from pathlib import Path
 from typing import Iterable
 
-from agent.models import Block, BlockKind, Document, PDFLocator, SlideLocator, SourceType
+from processing_agent.models import Block, BlockKind, Document, PDFLocator, SlideLocator, SourceType
 
 logger = logging.getLogger(__name__)
 

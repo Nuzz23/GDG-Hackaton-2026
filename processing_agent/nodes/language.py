@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import logging
 
-from agent.models import Language
-from agent.state import IndexingState
+from processing_agent.models import Language
+from processing_agent.state import IndexingState
 
 logger = logging.getLogger(__name__)
 

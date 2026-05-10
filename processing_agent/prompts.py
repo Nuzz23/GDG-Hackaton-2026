@@ -16,7 +16,7 @@ source is the project's failure mode.
 
 from __future__ import annotations
 
-from agent.models import Language
+from processing_agent.models import Language
 
 
 # ---------------------------------------------------------------------------

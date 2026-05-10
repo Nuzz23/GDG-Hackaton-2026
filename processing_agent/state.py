@@ -11,7 +11,7 @@ from __future__ import annotations
 import operator
 from typing import Annotated, Optional, TypedDict
 
-from agent.models import (
+from processing_agent.models import (
     Block,
     Document,
     HierarchyNode,

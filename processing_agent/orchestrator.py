@@ -16,10 +16,10 @@ import logging
 from pathlib import Path
 from typing import Any, Optional
 
-from agent.aggregator import aggregate_folder
-from agent.graph import build_graph
-from agent.models import SourceType
-from agent.state import initial_state
+from processing_agent.aggregator import aggregate_folder
+from processing_agent.graph import build_graph
+from processing_agent.models import SourceType
+from processing_agent.state import initial_state
 
 logger = logging.getLogger(__name__)
 

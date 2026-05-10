@@ -12,8 +12,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from agent.asr import transcribe
-from agent.models import Block, BlockKind, Document, SourceType, TimeLocator
+from processing_agent.asr import transcribe
+from processing_agent.models import Block, BlockKind, Document, SourceType, TimeLocator
 
 logger = logging.getLogger(__name__)
 

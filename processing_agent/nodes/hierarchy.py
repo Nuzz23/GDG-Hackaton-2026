@@ -27,7 +27,7 @@ import logging
 from typing import Optional
 from uuid import uuid4
 
-from agent.models import (
+from processing_agent.models import (
     Block,
     BlockKind,
     HierarchyNode,
@@ -37,7 +37,7 @@ from agent.models import (
     SourceType,
     union_locators,
 )
-from agent.state import IndexingState
+from processing_agent.state import IndexingState
 
 logger = logging.getLogger(__name__)
 

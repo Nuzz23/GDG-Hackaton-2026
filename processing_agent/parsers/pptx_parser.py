@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from typing import Iterable
 
-from agent.models import Block, BlockKind, Document, SlideLocator, SourceType
+from processing_agent.models import Block, BlockKind, Document, SlideLocator, SourceType
 
 logger = logging.getLogger(__name__)
 

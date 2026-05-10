@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from langgraph.graph import END, StateGraph
 
-from agent.nodes import (
+from processing_agent.nodes import (
     cleaning,
     clustering,
     depth,
@@ -41,7 +41,7 @@ from agent.nodes import (
     structure,
     validate,
 )
-from agent.state import IndexingState
+from processing_agent.state import IndexingState
 
 
 def _halt(state: IndexingState) -> dict:

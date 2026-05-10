@@ -18,10 +18,10 @@ from __future__ import annotations
 
 import logging
 
-from agent.llm import call_json
-from agent.models import Block, SourceType
-from agent.prompts import CLEANING_FEWSHOT, CLEANING_SYSTEM, cleaning_user_prompt
-from agent.state import IndexingState
+from processing_agent.llm import call_json
+from processing_agent.models import Block, SourceType
+from processing_agent.prompts import CLEANING_FEWSHOT, CLEANING_SYSTEM, cleaning_user_prompt
+from processing_agent.state import IndexingState
 
 logger = logging.getLogger(__name__)
 

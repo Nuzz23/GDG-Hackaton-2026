@@ -19,7 +19,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from agent.models import (
+from processing_agent.models import (
     HierarchyNode,
     IndexOutput,
     Language,
@@ -27,7 +27,7 @@ from agent.models import (
     OutputMetadata,
     SourceInfo,
 )
-from agent.state import IndexingState
+from processing_agent.state import IndexingState
 
 logger = logging.getLogger(__name__)
 

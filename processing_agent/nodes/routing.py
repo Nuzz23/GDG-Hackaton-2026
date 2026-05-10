@@ -15,9 +15,9 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from agent.models import Document, SourceType
-from agent.parsers import parse_audio, parse_md, parse_pdf, parse_pptx, parse_video
-from agent.state import IndexingState
+from processing_agent.models import Document, SourceType
+from processing_agent.parsers import parse_audio, parse_md, parse_pdf, parse_pptx, parse_video
+from processing_agent.state import IndexingState
 
 logger = logging.getLogger(__name__)
 

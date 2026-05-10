@@ -17,8 +17,8 @@ import os
 import sys
 from pathlib import Path
 
-from agent.models import SourceType
-from agent.orchestrator import index_or_aggregate
+from processing_agent.models import SourceType
+from processing_agent.orchestrator import index_or_aggregate
 
 
 def main(argv: list[str] | None = None) -> int:
