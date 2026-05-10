@@ -41,7 +41,7 @@ class SubjectService:
 
     def get_subject(self, group_id: int, subject_id: int):
         with SessionLocal() as db:
-            subject = SubjectRepository.get_subject_by_id(db, subject_id)
+            subject = SubjectRepository.get_subject_by_id(db, group_id, subject_id)
 
             # Controllo di sicurezza: verifica che la materia esista E appartenga al gruppo
             if not subject or subject.group_id != group_id:
@@ -54,7 +54,7 @@ class SubjectService:
     def update_subject(self, group_id: int, subject_id: int, subject_update: SubjectUpdate):
         with SessionLocal() as db:
             # 1. Verifichiamo che l'utente abbia il diritto di modificare questa materia (tramite group_id)
-            subject = SubjectRepository.get_subject_by_id(db, subject_id)
+            subject = SubjectRepository.get_subject_by_id(db, group_id, subject_id)
             if not subject or subject.group_id != group_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -74,7 +74,7 @@ class SubjectService:
     def delete_subject(self, group_id: int, subject_id: int):
         with SessionLocal() as db:
             # 1. Verifica appartenenza al gruppo
-            subject = SubjectRepository.get_subject_by_id(db, subject_id)
+            subject = SubjectRepository.get_subject_by_id(db, group_id, subject_id)
             if not subject or subject.group_id != group_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -82,7 +82,7 @@ class SubjectService:
                 )
 
             # 2. Procediamo con l'eliminazione
-            success = SubjectRepository.delete_subject(db, subject_id)
+            success = SubjectRepository.delete_subject(db, group_id, subject_id)
             if not success:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

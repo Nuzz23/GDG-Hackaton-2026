@@ -1,6 +1,6 @@
 import React, { useState, useEffect, DragEvent, ChangeEvent } from 'react';
 import { useGroups } from '../hooks/useGroups';
-import '@/styles/GroupPage.css';
+import '../styles/GroupPage.css';
 import { subjectApi, materialApi } from '@/services/api';
 import type { Subject, Material } from '@/types/apiTypes';
 
