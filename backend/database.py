@@ -7,10 +7,14 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Database connection string
+# Database connection string.
+# We default to 127.0.0.1 (IPv4) instead of "localhost" because on Windows
+# the resolver often hits ::1 (IPv6) first, and the Docker-compose Postgres
+# only binds IPv4 — that combination produces the misleading "server closed
+# the connection unexpectedly" error during the SSL handshake.
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://admin:admin@localhost:5432/postgres"
+    "postgresql://admin:admin@127.0.0.1:5432/postgres"
 )
 
 # Create engine

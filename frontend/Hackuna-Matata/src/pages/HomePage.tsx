@@ -563,82 +563,139 @@ export const HomePage: React.FC = () => {
 
           <div style={{
             background: "white",
-            padding: "2rem",
-            borderRadius: "1.2rem",
-            boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+            padding: "2.25rem 2.5rem",
+            borderRadius: "1rem",
+            boxShadow: "0 8px 30px rgba(0, 0, 0, 0.12)",
             display: "flex",
             flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "50vw",
-            height: "auto",
-            gap: "1rem"
+            width: "min(640px, 92vw)",
+            maxHeight: "92vh",
+            overflowY: "auto",
+            boxSizing: "border-box",
+            gap: "1.1rem",
           }}>
-            <h2>New Study Session</h2>
-
-            <input
-              type="text"
-              placeholder="Subject Name"
-              value={subjectName}
-              onChange={(e) => setSubjectName(e.target.value)}
-              style={{ width: "80%", padding: "0.5rem", borderRadius: "0.5rem", border: "1px solid #ccc" }}
-            />
-
-            <input
-              type="date"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              style={{ width: "80%", padding: "0.5rem", borderRadius: "0.5rem", border: "1px solid #ccc" }}
-            />
-
-            <input
-              type="text"
-              placeholder="Invite Collaborators"
-              value={collaborators}
-              onChange={(e) => setCollaborators(e.target.value)}
-              style={{ width: "80%", padding: "0.5rem", borderRadius: "0.5rem", border: "1px solid #ccc" }}
-            />
-
-            <div
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              onClick={() => document.getElementById('popup-file-upload')?.click()}
-              style={{
-                width: "80%",
-                height: "150px",
-                border: "2px dashed #ccc",
-                borderRadius: "0.5rem",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                backgroundColor: "#f9f9f9"
-              }}
-            >
-              <p>Drag and drop materials here, or click to select</p>
-              <input
-                id="popup-file-upload"
-                type="file"
-                multiple
-                onChange={handleFileChange}
-                style={{ display: "none" }}
-              />
-              {materials.length > 0 && (
-                <div style={{ marginTop: "0.5rem", fontSize: "0.8rem", textAlign: "center", maxHeight: "60px", overflowY: "auto" }}>
-                  {materials.map((m, i) => (
-                    <div key={i}>{m.name}</div>
-                  ))}
-                </div>
-              )}
+            {/* Title block — large, left-aligned, with subtitle */}
+            <div>
+              <h1 style={{
+                margin: 0, fontSize: "2rem", fontWeight: 800, color: "#1a1a1a",
+                letterSpacing: "-0.01em",
+              }}>
+                New Study Session
+              </h1>
+              <p style={{
+                margin: "0.35rem 0 0", color: "#7e7e85", fontSize: "0.95rem",
+              }}>
+                Fill in the session details and attach your materials.
+              </p>
             </div>
 
-            <div style={{ display: "flex", gap: "1rem", marginTop: "1.5rem" }}>
-              <button onClick={togglePopup} disabled={isSubmitting} style={{ padding: "0.5rem 1rem", cursor: "pointer" }}>
+            {/* Subject Name — card field */}
+            <FieldCard label="SUBJECT NAME">
+              <input
+                type="text"
+                placeholder="Enter subject name"
+                value={subjectName}
+                onChange={(e) => setSubjectName(e.target.value)}
+                style={fieldInputStyle}
+              />
+            </FieldCard>
+
+            {/* Two-column row: Deadline + Collaborators */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem",
+            }}>
+              <FieldCard label="DEADLINE">
+                <input
+                  type="date"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  style={fieldInputStyle}
+                />
+              </FieldCard>
+              <FieldCard label="COLLABORATORS">
+                <input
+                  type="text"
+                  placeholder="Invite collaborators"
+                  value={collaborators}
+                  onChange={(e) => setCollaborators(e.target.value)}
+                  style={fieldInputStyle}
+                />
+              </FieldCard>
+            </div>
+
+            {/* Materials drop zone — same card aesthetic, dashed inner border */}
+            <FieldCard label="MATERIALS">
+              <div
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('popup-file-upload')?.click()}
+                style={{
+                  marginTop: "0.4rem",
+                  height: "140px",
+                  border: "2px dashed #c8c8d0",
+                  borderRadius: "0.6rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  background: "white",
+                  color: "#5b5b66",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "0.95rem" }}>
+                  Drag and drop materials here, or click to select
+                </p>
+                <input
+                  id="popup-file-upload"
+                  type="file"
+                  multiple
+                  onChange={handleFileChange}
+                  style={{ display: "none" }}
+                />
+                {materials.length > 0 && (
+                  <div style={{
+                    marginTop: "0.5rem", fontSize: "0.82rem",
+                    textAlign: "center", maxHeight: "60px", overflowY: "auto",
+                    color: "#1a1a1a",
+                  }}>
+                    {materials.map((m, i) => (
+                      <div key={i}>{m.name}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </FieldCard>
+
+            {/* Footer — buttons bottom-right */}
+            <div style={{
+              display: "flex", justifyContent: "flex-end", alignItems: "center",
+              gap: "0.5rem", marginTop: "0.5rem",
+            }}>
+              <button
+                onClick={togglePopup}
+                disabled={isSubmitting}
+                style={{
+                  background: "transparent", border: "none",
+                  color: "#5b5bd6", fontWeight: 600, fontSize: "0.95rem",
+                  padding: "0.6rem 1rem",
+                  cursor: isSubmitting ? "not-allowed" : "pointer",
+                }}
+              >
                 Cancel
               </button>
-              <button onClick={handleConfirm} disabled={isSubmitting || !subjectName} style={{ padding: "0.5rem 1rem", cursor: "pointer" }}>
-                {isSubmitting ? "Confirming..." : "Confirm"}
+              <button
+                onClick={handleConfirm}
+                disabled={isSubmitting || !subjectName}
+                style={{
+                  padding: "0.6rem 1.4rem",
+                  background: (isSubmitting || !subjectName) ? "#a8a8e0" : "#5b5bd6",
+                  color: "white", border: "none", borderRadius: "0.55rem",
+                  fontWeight: 700, fontSize: "0.95rem",
+                  cursor: (isSubmitting || !subjectName) ? "not-allowed" : "pointer",
+                }}
+              >
+                {isSubmitting ? "Confirming…" : "Confirm"}
               </button>
             </div>
           </div>
@@ -659,6 +716,37 @@ export const HomePage: React.FC = () => {
 
     </div>
   );
+};
+
+/** Card-shaped form field used by the New Study Session popup.
+ *  Light gray pill with the uppercase label inside (top-left), and the
+ *  control (input / drop zone / etc.) sitting underneath. Mirrors the
+ *  "Carica testo" mockup. */
+function FieldCard({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      background: "#f4f4f7",
+      borderRadius: "0.75rem",
+      padding: "0.7rem 0.95rem",
+    }}>
+      <div style={{
+        fontSize: "0.7rem", fontWeight: 700, color: "#7e7e85",
+        letterSpacing: "0.05em", marginBottom: "0.15rem",
+      }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Shared style for inputs sitting inside a FieldCard — borderless, the
+ *  card itself provides the visual frame. */
+const fieldInputStyle: React.CSSProperties = {
+  width: "100%",
+  border: "none", outline: "none", background: "transparent",
+  padding: 0, fontSize: "1rem", color: "#1a1a1a",
+  fontFamily: "inherit",
 };
 
 /** "John Doe" → "JD". Falls back to the first 2 chars on single-token names. */
