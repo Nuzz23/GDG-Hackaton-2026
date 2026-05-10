@@ -47,6 +47,12 @@ from repository.materialRepository import MaterialRepository
 logger = logging.getLogger(__name__)
 
 
+# Minimum text length (in chars) we'll accept before sending a node to the
+# quiz generator. Below this the LLM tends to return an empty array — the
+# correct behavior, but a confusing UX. Fail fast instead.
+_MIN_NODE_TEXT_CHARS = 100
+
+
 # ---------------------------------------------------------------------------
 # Lazy imports of the agents — keeps startup cheap if a deployment doesn't
 # need them, and isolates failure modes when an agent dependency is missing.
@@ -201,6 +207,22 @@ class AgentService:
                 detail=f"node_id {node_id!r} not found in the latest index",
             )
 
+        # Upfront text-length validation: if the selected node has too little
+        # text, the LLM will correctly refuse to generate items and we'd
+        # waste an API call. Fail fast with a clear message instead.
+        text_len = self._collect_node_text_len(node)
+        if text_len < _MIN_NODE_TEXT_CHARS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"The selected node has only {text_len} characters of text — "
+                    f"too little for the LLM to generate meaningful items "
+                    f"(minimum: {_MIN_NODE_TEXT_CHARS} chars). "
+                    "Try selecting a longer paragraph, or a parent section/chapter "
+                    "(which aggregates the text of all its leaves)."
+                ),
+            )
+
         generate_quiz_fn, Difficulty, ItemType = _quiz_agent()
         try:
             it = ItemType(item_type)
@@ -237,6 +259,48 @@ class AgentService:
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+        # The agent's defensive parsing returns a partial QuizOutput with
+        # n_produced=0 instead of raising when the LLM call itself failed
+        # (quota, network, malformed JSON) OR when the LLM legitimately
+        # returned an empty array (e.g. content judged too thin). For the
+        # API surface we want this to be a hard error rather than a silent
+        # empty quiz that the frontend would render as "session over".
+        if quiz_payload.get("n_produced", 0) == 0:
+            warnings = (quiz_payload.get("metadata", {}) or {}).get("warnings") or []
+            joined = " | ".join(warnings) if warnings else ""
+            is_quota = "RESOURCE_EXHAUSTED" in joined or "quota" in joined.lower()
+
+            if is_quota:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        "Gemini quota exhausted. Wait for the daily reset (~9am IT), "
+                        "rotate the API key, or temporarily switch model with "
+                        "AGENT_GEMINI_MODEL=gemini-2.5-flash-lite (higher quota). "
+                        f"Underlying: {joined[:200]}"
+                    ),
+                )
+
+            if not joined:
+                # No warnings = the LLM returned an empty list cleanly.
+                # Most likely the source text wasn't substantive enough.
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "The LLM judged the selected node insufficient to "
+                        "generate meaningful items, even though there's some "
+                        "text. Try a parent section/chapter (more content), "
+                        "or pick a paragraph with denser substantive material. "
+                        "If the content really is enough, lowering difficulty "
+                        "may help."
+                    ),
+                )
+
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Quiz generation produced 0 items. Underlying: {joined[:300]}",
+            )
 
         with SessionLocal() as db:
             artifact = ArtifactRepository.create_artifact(
@@ -396,6 +460,21 @@ class AgentService:
             if found is not None:
                 return found
         return None
+
+    @staticmethod
+    def _collect_node_text_len(node: dict) -> int:
+        """Estimate total text length under a node.
+
+        For a leaf paragraph this is just len(node['text']). For an internal
+        node we sum the text length of every leaf descendant — which is also
+        the input that quiz_creation_agent will collect when generating.
+        """
+        if not isinstance(node, dict):
+            return 0
+        children = node.get("children") or []
+        if not children:
+            return len((node.get("text") or "").strip())
+        return sum(AgentService._collect_node_text_len(c) for c in children)
 
     @staticmethod
     def _persist_uploaded_audio(material_id: int, audio: UploadFile) -> str:

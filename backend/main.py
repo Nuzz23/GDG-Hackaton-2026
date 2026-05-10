@@ -50,6 +50,25 @@ def _seed_default_group():
         print(f"Seeded default group (id=1) with user '{user.username}'")
 
 
+def _print_env_summary() -> None:
+    """Print which agent-relevant env vars are set, WITHOUT leaking values.
+
+    We only show whether each variable is present and (for the model) its
+    value, since the model name is not sensitive.
+    """
+    import os
+    flash_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    pro_key = os.environ.get("GEMINI_PRO_API_KEY")
+    model = os.environ.get("AGENT_GEMINI_MODEL", "gemini-2.5-flash (default)")
+    whisper_model = os.environ.get("AGENT_WHISPER_MODEL", "medium (default)")
+    whisper_vad = os.environ.get("AGENT_WHISPER_VAD", "true (default)")
+    print("[env] GOOGLE_API_KEY/GEMINI_API_KEY:", "set" if flash_key else "NOT set ⚠")
+    print("[env] GEMINI_PRO_API_KEY:           ", "set" if pro_key else "not set (only needed for --pro)")
+    print("[env] AGENT_GEMINI_MODEL:           ", model)
+    print("[env] AGENT_WHISPER_MODEL:          ", whisper_model)
+    print("[env] AGENT_WHISPER_VAD:            ", whisper_vad)
+
+
 def _prewarm_agents() -> None:
     """Trigger the lazy imports of the three agents in a background thread.
 
@@ -71,6 +90,10 @@ def _prewarm_agents() -> None:
         # Also compile the processing graph so the first call doesn't pay it.
         from processing_agent.graph import build_graph as build_processing_graph
         build_processing_graph()
+        # Now that agent.llm has run load_dotenv() at import, the env is
+        # fully populated. Print the summary AFTER prewarm so the user sees
+        # the resolved state.
+        _print_env_summary()
         print(f"[prewarm] agent imports + graph compile complete in {time.perf_counter()-t0:.1f}s")
     except Exception as e:
         print(f"[prewarm] failed (non-fatal): {e!r}")

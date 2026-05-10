@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
 import '../styles/GroupPage.css';
 import { subjectApi, materialApi } from '@/services/api';
-import type { Subject, Material } from '@/types/apiTypes';
+import type { Subject, Material, IndexOutput } from '@/types/apiTypes';
 import { MaterialDetailView } from '@/components/MaterialDetailView';
+import { IndexTree } from '@/components/IndexTree';
+
+type SidebarMode = 'profile' | 'index';
 
 export const HomePage: React.FC = () => {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -19,8 +22,24 @@ export const HomePage: React.FC = () => {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
 
+  // ── Document-reading state lifted up so the left sidebar can swap
+  // between the John Doe profile view and the per-material Index tree.
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>('profile');
+  const [matIndex, setMatIndex] = useState<IndexOutput | null>(null);
+  const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
+  const [scrollTargetId, setScrollTargetId] = useState<string | null>(null);
+
   const groupId = 1;
   const userName = "John Doe";
+
+  // Whenever we open/close a material, reset the document state and pick a
+  // sensible sidebar mode (auto-flip to Index when a material is opened).
+  useEffect(() => {
+    setMatIndex(null);
+    setCurrentNodeId(null);
+    setScrollTargetId(null);
+    setSidebarMode(selectedMaterial ? 'index' : 'profile');
+  }, [(selectedMaterial as any)?.id]);
 
   const fetchSubjects = async () => {
     try {
@@ -139,46 +158,104 @@ export const HomePage: React.FC = () => {
   return (
     <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", position: "relative" }}>
 
-      <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", height: "92vh", width: "20vw", overflow: "hidden" }}>
+      {/* ── Left sidebar: profile mode (John Doe + subjects) OR index mode
+            (Index tree of the currently-open material). The arrow on top
+            toggles between the two when a material is open. ───────────── */}
+      {!(selectedMaterial && sidebarMode === 'index' && matIndex) ? (
+        <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", height: "92vh", width: "20vw", overflow: "hidden" }}>
 
-        <div style={{ width: "100%", padding: "1.5rem 1.5rem 1rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", boxSizing: "border-box" }}>
-          <span style={{ fontWeight: "bold", color: "#333", fontSize: "1.5rem" }}>
-            {userName}
-          </span>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer" }}>
-            <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"/>
-          </svg>
+          <div style={{ width: "100%", padding: "1.5rem 1.5rem 1rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", boxSizing: "border-box" }}>
+            <span style={{ fontWeight: "bold", color: "#333", fontSize: "1.5rem" }}>
+              {userName}
+            </span>
+            {/* When a material is open, show a → arrow to flip the sidebar
+                into Index mode. Otherwise show the bell icon. */}
+            {selectedMaterial && matIndex ? (
+              <button
+                onClick={() => setSidebarMode('index')}
+                title="Show document index"
+                style={{
+                  border: "none", background: "transparent", cursor: "pointer",
+                  padding: 4, display: "flex", alignItems: "center",
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/>
+                </svg>
+              </button>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer" }}>
+                <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"/>
+                </svg>
+            )}
+          </div>
+
+          <hr style={{ width: "100%", border: "none", height: "2px", margin: "0", marginBottom: "1rem", background: "rgba(0, 0, 0, 0.1)" }} />
+
+          <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", flex: 1, overflowY: "auto", paddingBottom: "1rem" }}>
+            {subjects.map((subject) => (
+              <div
+                key={subject.id}
+                onClick={() => handleSubjectClick(subject)}
+                style={{
+                  width: "80%",
+                  padding: "0.8rem",
+                  backgroundColor: selectedSubject?.id === subject.id ? "#d4d4b8" : "white",
+                  borderRadius: "0.8rem",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                  cursor: "pointer",
+                  textAlign: "center",
+                  fontWeight: "bold",
+                  color: "#333",
+                  border: "1px solid transparent",
+                  transition: "all 0.2s",
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => { if (selectedSubject?.id !== subject.id) e.currentTarget.style.border = "1px solid #aaa" }}
+                onMouseLeave={(e) => { if (selectedSubject?.id !== subject.id) e.currentTarget.style.border = "1px solid transparent" }}
+              >
+                {subject.name}
+              </div>
+            ))}
+          </div>
         </div>
-        
-        <hr style={{ width: "100%", border: "none", height: "2px", margin: "0", marginBottom: "1rem", background: "rgba(0, 0, 0, 0.1)" }} />
-
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", flex: 1, overflowY: "auto", paddingBottom: "1rem" }}>
-          {subjects.map((subject) => (
-            <div
-              key={subject.id}
-              onClick={() => handleSubjectClick(subject)}
+      ) : (
+        // ── Index sidebar: replaces the John Doe panel while reading. ──
+        <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", height: "92vh", width: "20vw", overflow: "hidden" }}>
+          <div style={{ width: "100%", padding: "1.2rem 1.2rem 0.8rem 1.2rem", display: "flex", alignItems: "center", justifyContent: "space-between", boxSizing: "border-box" }}>
+            <button
+              onClick={() => setSidebarMode('profile')}
+              title="Back to profile"
               style={{
-                width: "80%",
-                padding: "0.8rem",
-                backgroundColor: selectedSubject?.id === subject.id ? "#d4d4b8" : "white",
-                borderRadius: "0.8rem",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                cursor: "pointer",
-                textAlign: "center",
-                fontWeight: "bold",
-                color: "#333",
-                border: "1px solid transparent",
-                transition: "all 0.2s",
-                flexShrink: 0
+                border: "none", background: "transparent", cursor: "pointer",
+                padding: 4, display: "flex", alignItems: "center",
               }}
-              onMouseEnter={(e) => { if (selectedSubject?.id !== subject.id) e.currentTarget.style.border = "1px solid #aaa" }}
-              onMouseLeave={(e) => { if (selectedSubject?.id !== subject.id) e.currentTarget.style.border = "1px solid transparent" }}
             >
-              {subject.name}
-            </div>
-          ))}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/>
+              </svg>
+            </button>
+            <span style={{ fontWeight: "bold", color: "#333", fontSize: "1.1rem" }}>
+              Index
+            </span>
+            <span style={{ width: 24 }} />
+          </div>
+
+          <hr style={{ width: "100%", border: "none", height: "2px", margin: "0", marginBottom: "0.5rem", background: "rgba(0, 0, 0, 0.1)" }} />
+
+          <div style={{ padding: "0 1rem", fontSize: 11, color: "#789", marginBottom: 8, wordBreak: "break-word" }}>
+            {matIndex.source.filename} · {matIndex.source.language}
+          </div>
+
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 1rem 1rem" }}>
+            <IndexTree
+              node={matIndex.tree}
+              selectedNodeId={currentNodeId}
+              onSelect={(n) => setScrollTargetId(n.node_id)}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {!selectedSubject ? (
         <div style={{
@@ -224,6 +301,11 @@ export const HomePage: React.FC = () => {
             materialId={(selectedMaterial as any).id}
             materialName={(selectedMaterial as any).name || 'Document'}
             onBack={() => setSelectedMaterial(null)}
+            index={matIndex}
+            onIndexLoaded={setMatIndex}
+            currentNodeId={currentNodeId}
+            onCurrentNodeChange={setCurrentNodeId}
+            scrollTargetId={scrollTargetId}
           />
         </div>
       ) : (

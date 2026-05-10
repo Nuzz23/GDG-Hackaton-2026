@@ -1,50 +1,68 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { agentApi } from '@/services/api';
-import type {
-  HierarchyNode, IndexOutput, QuizOutput, ItemTypeCode, Difficulty,
-} from '@/types/apiTypes';
-import { IndexTree } from './IndexTree';
-import { QuizPlayer } from './QuizPlayer';
-import { nodeTitle } from '@/utils/nodeTitle';
+import type { HierarchyNode, IndexOutput } from '@/types/apiTypes';
+import { MaterialReader } from './MaterialReader';
+import { QuizModal } from './QuizModal';
+import { findPath, nearestSectionAncestor, pathLabels } from '@/utils/treeWalk';
 
 interface MaterialDetailViewProps {
   groupId: number;
   materialId: number;
   materialName: string;
   onBack: () => void;
+
+  /** Lifted-up index state — owned by HomePage so the left sidebar can
+   *  show the IndexTree in place of the John Doe profile panel. */
+  index: IndexOutput | null;
+  onIndexLoaded: (index: IndexOutput) => void;
+
+  /** Heading currently topmost in the reader — set by us, read by HomePage
+   *  to highlight the right node in the sidebar tree. */
+  currentNodeId: string | null;
+  onCurrentNodeChange: (id: string) => void;
+
+  /** When HomePage's tree-click sets this, the reader scrolls to it. */
+  scrollTargetId: string | null;
 }
 
-type Phase = 'idle' | 'indexing' | 'index_ready' | 'generating' | 'playing';
+type Phase = 'idle' | 'indexing' | 'index_ready';
 
 /**
- * The full AI flow for a single material:
- *   1. (idle)         Show "Index this material" button
- *   2. (indexing)     Spinner while processing_agent runs
- *   3. (index_ready)  Show IndexTree; user picks a node
- *   4. (generating)   Form (type/n/difficulty) → spinner while quiz_creation_agent runs
- *   5. (playing)      QuizPlayer takes over
+ * Two-column reading view (the index tree lives in HomePage's sidebar):
+ *   ┌──────────────────────────────┬──────────┐
+ *   │  Breadcrumb + Quiz button    │ (side)   │
+ *   │  ───────────────────────     │          │
+ *   │  Scrollable reader           │          │
+ *   └──────────────────────────────┴──────────┘
+ *
+ * Scrolling the reader updates the breadcrumb live; when HomePage flips
+ * `scrollTargetId`, the reader scrolls to that heading. The "Mettimi alla
+ * prova" button opens a centered modal whose target is the closest
+ * non-paragraph ancestor of the currently-visible heading.
  */
 export function MaterialDetailView(props: MaterialDetailViewProps) {
-  const { groupId, materialId, materialName, onBack } = props;
+  const {
+    groupId, materialId, materialName, onBack,
+    index, onIndexLoaded,
+    currentNodeId, onCurrentNodeChange,
+    scrollTargetId,
+  } = props;
 
-  const [phase, setPhase] = useState<Phase>('idle');
+  const [phase, setPhase] = useState<Phase>(index ? 'index_ready' : 'idle');
   const [error, setError] = useState<string | null>(null);
-  const [index, setIndex] = useState<IndexOutput | null>(null);
-  const [selectedNode, setSelectedNode] = useState<HierarchyNode | null>(null);
-  const [quiz, setQuiz] = useState<QuizOutput | null>(null);
-  const [quizArtifactId, setQuizArtifactId] = useState<number | null>(null);
+  const [quizOpen, setQuizOpen] = useState(false);
 
-  // Form for quiz generation
-  const [itemType, setItemType] = useState<ItemTypeCode>('qa');
-  const [n, setN] = useState<number>(3);
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-
-  // On mount, try to load an existing index for this material
+  // On mount (or when materialId changes) try to load an existing index.
+  // If HomePage already has it cached we skip the fetch.
   useEffect(() => {
+    if (index) {
+      setPhase('index_ready');
+      return;
+    }
     (async () => {
       try {
         const r = await agentApi.getLatestIndex(materialId);
-        setIndex(r.data.index);
+        onIndexLoaded(r.data.index);
         setPhase('index_ready');
       } catch (e: any) {
         if (e?.response?.status !== 404) {
@@ -61,7 +79,7 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
     setPhase('indexing');
     try {
       const r = await agentApi.indexMaterial(groupId, materialId);
-      setIndex(r.data.index);
+      onIndexLoaded(r.data.index);
       setPhase('index_ready');
     } catch (e: any) {
       setError(e?.response?.data?.detail || e?.message || 'Indexing failed');
@@ -69,44 +87,36 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
     }
   };
 
-  const runQuizGeneration = async () => {
-    if (!selectedNode) return;
-    setError(null);
-    setPhase('generating');
-    try {
-      const r = await agentApi.generateQuiz(materialId, {
-        node_id: selectedNode.node_id,
-        item_type: itemType,
-        n,
-        difficulty,
-      });
-      setQuiz(r.data.quiz);
-      setQuizArtifactId(r.data.artifact_id);
-      setPhase('playing');
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.message || 'Quiz generation failed');
-      setPhase('index_ready');
-    }
-  };
+  // Path from root to the currently-visible heading (used for breadcrumb
+  // and for promoting paragraph leaves to their nearest section ancestor
+  // when the user opens the quiz modal).
+  const currentPath = useMemo(() => {
+    if (!index?.tree || !currentNodeId) return null;
+    return findPath(index.tree, currentNodeId);
+  }, [index, currentNodeId]);
 
-  const restart = () => {
-    setQuiz(null);
-    setQuizArtifactId(null);
-    setSelectedNode(null);
-    setPhase('index_ready');
-  };
+  const breadcrumb = useMemo(() => pathLabels(currentPath), [currentPath]);
+
+  const quizTargetNode: HierarchyNode | null = useMemo(() => {
+    if (!currentPath) return null;
+    return nearestSectionAncestor(currentPath);
+  }, [currentPath]);
 
   return (
     <div style={{
-      width: '100%', height: '100%', padding: 24, overflowY: 'auto',
-      boxSizing: 'border-box',
+      width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
+      boxSizing: 'border-box', background: '#fafbfc',
     }}>
+      {/* Top bar */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: 20,
+        padding: '14px 24px', borderBottom: '1px solid #e6e8eb', background: 'white',
       }}>
-        <h2 style={{ margin: 0 }}>📚 {materialName}</h2>
-        <button onClick={onBack} style={{ padding: '6px 12px', cursor: 'pointer' }}>
+        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>📚 {materialName}</h2>
+        <button onClick={onBack} style={{
+          padding: '6px 12px', cursor: 'pointer',
+          border: '1px solid #ccc', background: 'white', borderRadius: 4,
+        }}>
           ← Back
         </button>
       </div>
@@ -114,15 +124,15 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
       {error && (
         <div style={{
           padding: 12, background: '#fdebee', borderLeft: '4px solid #c0392b',
-          marginBottom: 16, fontSize: 14, color: '#922',
+          margin: 16, fontSize: 14, color: '#922',
         }}>
           ⚠ {error}
         </div>
       )}
 
-      {/* PHASE: idle ────────────────────────────────── */}
+      {/* PHASE: idle ───────────────────────────────────── */}
       {phase === 'idle' && (
-        <div style={{ textAlign: 'center', padding: 40 }}>
+        <div style={{ textAlign: 'center', padding: 60, flex: 1 }}>
           <p style={{ fontSize: 16, color: '#555', marginBottom: 20 }}>
             This material hasn't been indexed yet. The first step is to extract its hierarchical structure.
           </p>
@@ -141,9 +151,9 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
         </div>
       )}
 
-      {/* PHASE: indexing ─────────────────────────────── */}
+      {/* PHASE: indexing ──────────────────────────────── */}
       {phase === 'indexing' && (
-        <div style={{ textAlign: 'center', padding: 40 }}>
+        <div style={{ textAlign: 'center', padding: 60, flex: 1 }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
           <p>Indexing in progress…</p>
           <p style={{ fontSize: 12, color: '#888' }}>
@@ -152,121 +162,90 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
         </div>
       )}
 
-      {/* PHASE: index_ready or generating ────────────── */}
-      {(phase === 'index_ready' || phase === 'generating') && index && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          {/* Left: Index tree */}
+      {/* PHASE: index_ready — 2-column layout (index tree is in HomePage sidebar) */}
+      {phase === 'index_ready' && index && (
+        <div style={{
+          flex: 1, minHeight: 0,
+          display: 'grid',
+          gridTemplateColumns: '1fr 240px',
+          gap: 16, padding: 16,
+        }}>
+          {/* ── Center: breadcrumb + button + reader ───── */}
           <div style={{
-            border: '1px solid #ddd', borderRadius: 8, padding: 16,
-            background: 'white', maxHeight: '70vh', overflowY: 'auto',
+            background: 'white', border: '1px solid #e6e8eb', borderRadius: 10,
+            display: 'flex', flexDirection: 'column', minHeight: 0,
           }}>
-            <h3 style={{ marginTop: 0 }}>Index</h3>
-            <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-              {index.source.filename} · {index.source.language} ·{' '}
-              {Object.entries(index.source.size_metric).map(([k, v]) => `${v} ${k}`).join(', ')}
+            {/* Breadcrumb header */}
+            <div style={{
+              padding: '14px 18px', borderBottom: '1px solid #eef0f2',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              gap: 12, flexWrap: 'wrap',
+            }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 11, color: '#789', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                  Currently reading
+                </div>
+                <div style={{
+                  fontSize: 14, color: '#234', fontWeight: 600,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {breadcrumb.length > 0 ? breadcrumb.join(' › ') : '—'}
+                </div>
+              </div>
+              <button
+                onClick={() => setQuizOpen(true)}
+                disabled={!quizTargetNode}
+                style={{
+                  padding: '10px 18px', fontSize: 14, fontWeight: 600,
+                  background: quizTargetNode ? '#27ae60' : '#a8c9b3',
+                  color: 'white', border: 'none', borderRadius: 6,
+                  cursor: quizTargetNode ? 'pointer' : 'not-allowed',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Mettimi alla prova
+              </button>
             </div>
-            <IndexTree
-              node={index.tree}
-              selectedNodeId={selectedNode?.node_id || null}
-              onSelect={(n) => setSelectedNode(n)}
-            />
+
+            {/* Reader */}
+            <div style={{ flex: 1, minHeight: 0, padding: '8px 18px' }}>
+              <MaterialReader
+                tree={index.tree}
+                onCurrentNodeChange={onCurrentNodeChange}
+                scrollToNodeId={scrollTargetId}
+              />
+            </div>
           </div>
 
-          {/* Right: Quiz generation form */}
+          {/* ── Right: side panel placeholder ──────────── */}
           <div style={{
-            border: '1px solid #ddd', borderRadius: 8, padding: 16, background: 'white',
+            background: 'white', border: '1px solid #e6e8eb', borderRadius: 10,
+            padding: 14, overflowY: 'auto', minHeight: 0,
           }}>
-            <h3 style={{ marginTop: 0 }}>Generate quiz</h3>
-            {!selectedNode ? (
-              <p style={{ color: '#888', fontStyle: 'italic' }}>
-                Pick a node from the index on the left.
-              </p>
-            ) : (
-              <>
-                <div style={{ marginBottom: 16, padding: 10, background: '#e8f4fd', borderRadius: 4 }}>
-                  <div style={{ fontSize: 12, color: '#555' }}>Selected:</div>
-                  <div style={{ fontWeight: 'bold' }}>
-                    {nodeTitle(selectedNode, 80)}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#888', textTransform: 'capitalize' }}>
-                    {selectedNode.kind}
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>Type</label>
-                  <select
-                    value={itemType}
-                    onChange={(e) => setItemType(e.target.value as ItemTypeCode)}
-                    style={{ width: '100%', padding: 8, fontSize: 14 }}
-                  >
-                    <option value="qa">Open question</option>
-                    <option value="mcq">Multiple choice</option>
-                    <option value="f">Flashcard</option>
-                  </select>
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>Difficulty</label>
-                  <select
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                    style={{ width: '100%', padding: 8, fontSize: 14 }}
-                  >
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </div>
-
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
-                    Number of items: <b>{n}</b>
-                  </label>
-                  <input
-                    type="range" min={1} max={10} value={n}
-                    onChange={(e) => setN(parseInt(e.target.value))}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-
-                <button
-                  onClick={runQuizGeneration}
-                  disabled={phase === 'generating'}
-                  style={{
-                    padding: '10px 20px', fontSize: 15, background: '#27ae60',
-                    color: 'white', border: 'none', borderRadius: 4,
-                    cursor: phase === 'generating' ? 'wait' : 'pointer',
-                    width: '100%',
-                  }}
-                >
-                  {phase === 'generating' ? '⏳ Generating…' : 'Generate'}
-                </button>
-              </>
-            )}
+            <h3 style={{ marginTop: 0, fontSize: '0.95rem' }}>Session</h3>
+            <p style={{ fontSize: 12, color: '#789', lineHeight: 1.5 }}>
+              Scroll through the material and use <b>Mettimi alla prova</b>
+              {' '}to generate a quiz on the section you're currently reading.
+            </p>
+            <div style={{
+              marginTop: 16, padding: 10, background: '#f5f8fb',
+              borderRadius: 6, fontSize: 11, color: '#456',
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Tip</div>
+              The quiz target follows the heading currently in view — change
+              section by scrolling, then hit the green button.
+            </div>
           </div>
         </div>
       )}
 
-      {/* PHASE: playing ──────────────────────────────── */}
-      {phase === 'playing' && quiz && quizArtifactId !== null && (
-        <div>
-          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 13, color: '#666' }}>
-              Quiz on: <b>{selectedNode ? nodeTitle(selectedNode, 50) : '—'}</b> ·{' '}
-              {quiz.n_produced} {quiz.item_type} · {quiz.difficulty}
-            </span>
-            <button onClick={restart} style={{ padding: '4px 10px', cursor: 'pointer' }}>
-              New quiz
-            </button>
-          </div>
-          <QuizPlayer
-            materialId={materialId}
-            quizId={quizArtifactId}
-            items={quiz.items}
-          />
-        </div>
-      )}
+      {/* Quiz modal — overlays everything ──────────────── */}
+      <QuizModal
+        isOpen={quizOpen}
+        onClose={() => setQuizOpen(false)}
+        materialId={materialId}
+        targetNode={quizTargetNode}
+      />
     </div>
   );
 }
