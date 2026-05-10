@@ -59,14 +59,32 @@ def from_quiz_item(quiz_item: Any, *, language: str) -> AssessmentItem:
     source = d.get("source") or {}
     node_id = source.get("node_id") or f"merged:{d.get('item_id', 'unknown')}"
 
+    locator_summary = _summarize_locator(
+        source.get("locator"), source.get("source_label")
+    )
+    # Fallback when neither a label nor a locator was available (typical of
+    # multi-node / "All document" quiz generation, which goes through the
+    # raw-text path and loses the per-node anchor): point at the source
+    # paragraph itself by quoting its first words. Worst case we mention
+    # the filename. Anything beats "(unknown location)" — the user reads
+    # the locator inside the intervention message.
+    if locator_summary == "(unknown location)":
+        excerpt = (source.get("excerpt") or "").strip().replace("\n", " ")
+        filename = (source.get("source_filename") or "").strip()
+        if excerpt:
+            snippet = excerpt[:60] + ("…" if len(excerpt) > 60 else "")
+            locator_summary = f'the paragraph starting with "{snippet}"'
+        elif filename:
+            locator_summary = filename
+        else:
+            locator_summary = "the document"
+
     common = dict(
         assessment_id=d["item_id"],
         node_id=node_id,
         assessment_type=_TYPE_MAP[item_type_str],
         source_excerpt=source.get("excerpt", ""),
-        source_locator_summary=_summarize_locator(
-            source.get("locator"), source.get("source_label")
-        ),
+        source_locator_summary=locator_summary,
         language=language,
     )
 

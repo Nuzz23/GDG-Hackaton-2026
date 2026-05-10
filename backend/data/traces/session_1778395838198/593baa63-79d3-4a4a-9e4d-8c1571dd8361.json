@@ -1,0 +1,40 @@
+{
+  "event_id": "593baa63-79d3-4a4a-9e4d-8c1571dd8361",
+  "session_id": "session_1778395838198",
+  "timestamp": "2026-05-10T06:52:35.976451Z",
+  "node_id": "merged:q_82d90443a7",
+  "assessment_type": "open_question",
+  "assessment_id": "q_82d90443a7",
+  "attempt_number": 1,
+  "response_modality": "text",
+  "response_raw": "sono frocio diocane",
+  "paralinguistic_features": null,
+  "judgment": {
+    "judgment_type": "open",
+    "completezza": "assente",
+    "correttezza": "errata",
+    "elaborazione": "non_valutabile",
+    "missing_aspects": [
+      "jointly optimizes RF topology and TFHE arithmetic precision",
+      "systematically explores a unified design space",
+      "considers number of trees, max tree depth, ciphertext bit-width",
+      "captures cross-layer interactions",
+      "enables discovery of inaccessible operating points"
+    ],
+    "incorrect_elements": [
+      "The response is offensive and irrelevant to the question, providing no information related to the source material."
+    ],
+    "elaboration_evidence": "The response is too short and irrelevant to the question to be evaluated for elaboration.",
+    "paralinguistic_contribution": null
+  },
+  "intervention": {
+    "kind": "redirect_only",
+    "student_message": "Let's take another look at the source material to make sure we're on the right track.",
+    "source_redirect": {
+      "node_id": "merged:q_82d90443a7",
+      "excerpt": "Thesis abstract  Fully Homomorphic Encryption (FHE) enables privacy-preserving machine learning by allowing inference to be performed directly on encrypted data",
+      "locator_summary": "(unknown location)"
+    }
+  },
+  "concept_status_after": "pending"
+}

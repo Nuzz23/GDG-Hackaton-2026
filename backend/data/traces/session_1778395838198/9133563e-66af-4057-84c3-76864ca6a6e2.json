@@ -1,0 +1,38 @@
+{
+  "event_id": "9133563e-66af-4057-84c3-76864ca6a6e2",
+  "session_id": "session_1778395838198",
+  "timestamp": "2026-05-10T06:51:22.921647Z",
+  "node_id": "merged:q_8c91594a3f",
+  "assessment_type": "open_question",
+  "assessment_id": "q_8c91594a3f",
+  "attempt_number": 1,
+  "response_modality": "audio",
+  "response_raw": "uploads\\audio_responses\\material_1\\535844acda_response.webm",
+  "paralinguistic_features": null,
+  "judgment": {
+    "judgment_type": "open",
+    "completezza": "assente",
+    "correttezza": "errata",
+    "elaborazione": "non_valutabile",
+    "missing_aspects": [
+      "optimizes RF hyperparameters then cryptographic precision",
+      "assumes weak coupling between model topology and ciphertext bit-width",
+      "assumption does not hold in practice",
+      "results in suboptimal accuracy-latency trade-offs",
+      "leads to inefficient encrypted implementations"
+    ],
+    "incorrect_elements": [],
+    "elaboration_evidence": "Risposta vuota.",
+    "paralinguistic_contribution": null
+  },
+  "intervention": {
+    "kind": "redirect_only",
+    "student_message": "Let's take another look at the material in (unknown location) to review this concept.",
+    "source_redirect": {
+      "node_id": "merged:q_8c91594a3f",
+      "excerpt": "Thesis abstract  Fully Homomorphic Encryption (FHE) enables privacy-preserving machine learning by allowing inference to be performed directly on encrypted data",
+      "locator_summary": "(unknown location)"
+    }
+  },
+  "concept_status_after": "pending"
+}

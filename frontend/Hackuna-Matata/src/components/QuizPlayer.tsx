@@ -29,16 +29,12 @@ export function QuizPlayer({ materialId, quizId, items }: QuizPlayerProps) {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [trace, setTrace] = useState<TraceEvent | null>(null);
+  const [allTraces, setAllTraces] = useState<TraceEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sessionId] = useState(`session_${Date.now()}`);
 
   if (idx >= items.length) {
-    return (
-      <div style={{ padding: 16, background: '#f8f9fa', borderRadius: 8 }}>
-        <h3>🎉 Sessione conclusa</h3>
-        <p>Hai completato tutti i {items.length} item del quiz.</p>
-      </div>
-    );
+    return <SessionSummary total={items.length} traces={allTraces} />;
   }
 
   const current = items[idx];
@@ -54,6 +50,7 @@ export function QuizPlayer({ materialId, quizId, items }: QuizPlayerProps) {
         sessionId,
       });
       setTrace(r.data.trace);
+      setAllTraces((prev) => [...prev, r.data.trace]);
     } catch (e: any) {
       setError(e?.response?.data?.detail || e?.message || 'Evaluation failed');
     } finally {
@@ -108,7 +105,7 @@ export function QuizPlayer({ materialId, quizId, items }: QuizPlayerProps) {
               border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold',
             }}
           >
-            {submitting ? 'Valutazione…' : 'Invia risposta'}
+            {submitting ? 'Evaluating…' : 'Submit answer'}
           </button>
         </div>
       )}
@@ -191,7 +188,7 @@ function ResponseInput(props: {
           type="text"
           value={textAnswer}
           onChange={(e) => setTextAnswer(e.target.value)}
-          placeholder="A / B / C / D  oppure  1 / 2 / 3 / 4"
+          placeholder="A / B / C / D   or   1 / 2 / 3 / 4"
           disabled={submitting}
           style={{
             width: '100%', padding: 10, fontSize: 16,
@@ -208,7 +205,7 @@ function ResponseInput(props: {
       <textarea
         value={textAnswer}
         onChange={(e) => setTextAnswer(e.target.value)}
-        placeholder="Scrivi qui la tua risposta…"
+        placeholder="Type your answer here…"
         rows={4}
         disabled={submitting}
         style={{
@@ -219,7 +216,7 @@ function ResponseInput(props: {
       {itemType === 'qa' && (
         <div style={{ marginTop: 10 }}>
           <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>
-            …oppure rispondi a voce (consigliato per domande aperte):
+            …or answer by voice (recommended for open questions):
           </div>
           <AudioRecorder onRecordingComplete={setAudioBlob} disabled={submitting} />
         </div>
@@ -273,9 +270,99 @@ function InterventionDisplay({
             border: 'none', borderRadius: 4, cursor: 'pointer',
           }}
         >
-          {isLast ? 'Termina sessione' : 'Prossimo item →'}
+          {isLast ? 'Finish session' : 'Next item →'}
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * End-of-session screen — short, English, 3-metric recap aggregated from
+ * the open-question judgments collected during the session.
+ *
+ * Closed-form items (flashcard / mcq) don't carry the 3-D rubric, so we
+ * report them separately as a simple correct/total count.
+ */
+function SessionSummary({ total, traces }: { total: number; traces: TraceEvent[] }) {
+  // Split judgments by type — the 3-metric recap only applies to open ones.
+  const openJudgments = traces
+    .map((t) => t.judgment)
+    .filter((j): j is Extract<TraceEvent['judgment'], { judgment_type: 'open' }> => j.judgment_type === 'open');
+  const closedJudgments = traces
+    .map((t) => t.judgment)
+    .filter((j): j is Extract<TraceEvent['judgment'], { judgment_type: 'closed' }> => j.judgment_type === 'closed');
+
+  // Numerical encoding so we can average across attempts. Same scale per
+  // metric: 2 = best, 0 = worst. The label thresholds below mirror what a
+  // teacher would intuitively call good / partial / weak.
+  const score = {
+    completezza: { alta: 2, parziale: 1, assente: 0 } as const,
+    correttezza: { corretta: 2, parzialmente_corretta: 1, errata: 0 } as const,
+    elaborazione: { rielaborata: 2, riportata: 1, non_valutabile: 1 } as const,
+  };
+
+  const labelFor = (avg: number): 'good' | 'partial' | 'weak' =>
+    avg >= 1.5 ? 'good' : avg >= 0.75 ? 'partial' : 'weak';
+
+  const avg = (xs: number[]) =>
+    xs.length === 0 ? null : xs.reduce((a, b) => a + b, 0) / xs.length;
+
+  const completenessAvg = avg(openJudgments.map((j) => score.completezza[j.completezza]));
+  const correctnessAvg = avg(openJudgments.map((j) => score.correttezza[j.correttezza]));
+  const reformulationAvg = avg(openJudgments.map((j) => score.elaborazione[j.elaborazione]));
+
+  const closedCorrect = closedJudgments.filter((j) => j.correct).length;
+
+  return (
+    <div style={{ padding: 20, background: '#f8f9fa', borderRadius: 8 }}>
+      <h3 style={{ marginTop: 0 }}>🎉 Session complete</h3>
+      <p style={{ marginTop: 0, color: '#456' }}>
+        You worked through all {total} items.
+      </p>
+
+      {openJudgments.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: '#789', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+            Open questions ({openJudgments.length})
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.7 }}>
+            <MetricLine label="Completeness"  value={completenessAvg}  labelFor={labelFor} />
+            <MetricLine label="Correctness"   value={correctnessAvg}   labelFor={labelFor} />
+            <MetricLine label="Reformulation" value={reformulationAvg} labelFor={labelFor} />
+          </ul>
+        </div>
+      )}
+
+      {closedJudgments.length > 0 && (
+        <p style={{ marginTop: 14, color: '#234' }}>
+          Closed items: <b>{closedCorrect} / {closedJudgments.length}</b> correct.
+        </p>
+      )}
+
+      {traces.length === 0 && (
+        <p style={{ color: '#789', fontStyle: 'italic' }}>
+          No answers were submitted during this session.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function MetricLine({
+  label, value, labelFor,
+}: {
+  label: string;
+  value: number | null;
+  labelFor: (v: number) => 'good' | 'partial' | 'weak';
+}) {
+  if (value === null) return null;
+  const verdict = labelFor(value);
+  const color = verdict === 'good' ? '#27ae60' : verdict === 'partial' ? '#f39c12' : '#c0392b';
+  return (
+    <li>
+      <b>{label}:</b>{' '}
+      <span style={{ color, fontWeight: 600 }}>{verdict}</span>
+    </li>
   );
 }
