@@ -1,6 +1,6 @@
 import apiClient from './apiClient';
 import type { 
-  User, UserUpdate, Group, GroupCreate, GroupUpdate, 
+  User, /* UserUpdate ,*/ Group, GroupCreate, GroupUpdate, 
   Subject, SubjectCreate, Material,
   SubjectUpdate, /* MaterialCreate */ 
 } from '@/types/apiTypes';
