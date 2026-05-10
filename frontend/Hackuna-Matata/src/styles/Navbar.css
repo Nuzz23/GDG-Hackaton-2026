@@ -1,0 +1,36 @@
+.navbar {
+  display: flex;
+  justify-content: space-between; /* Mette lo spazio in mezzo, spingendo gli elementi ai bordi */
+  align-items: center;
+  width: 100%; /* Fondamentale: forza la navbar ad occupare tutto lo schermo */
+  box-sizing: border-box; /* Fa in modo che il padding non allarghi la navbar oltre il 100% */
+  padding: 5px 16px 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.navbar-brand {
+  font-size: 24px;
+  font-weight: 800;
+  color: #2f2f2f; /* Testo bianco per contrastare lo sfondo scuro */
+  letter-spacing: -0.5px;
+}
+
+.logout-btn {
+  padding: 8px 16px;
+  background-color: #ef4444; 
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.logout-btn:hover {
+  background-color: #dc2626;
+}
+
+.logout-btn:active {
+  transform: scale(0.97);
+}
