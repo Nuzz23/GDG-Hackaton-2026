@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from model.material_artifact import MaterialArtifact
+from model.material_artifact import MaterialArtifact, ArtifactType
 from typing import Optional, List, Any, Dict
 
 

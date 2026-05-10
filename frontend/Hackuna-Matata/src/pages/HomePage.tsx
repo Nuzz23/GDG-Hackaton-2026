@@ -1,8 +1,9 @@
-import React, { useState, useEffect, DragEvent, ChangeEvent } from 'react';
-import { useGroups } from '../hooks/useGroups';
-import '@/styles/GroupPage.css';
+import { useState, useEffect } from 'react';
+import type { DragEvent, ChangeEvent } from 'react';
+import '../styles/GroupPage.css';
 import { subjectApi, materialApi } from '@/services/api';
 import type { Subject, Material } from '@/types/apiTypes';
+import { MaterialDetailView } from '@/components/MaterialDetailView';
 
 export const HomePage: React.FC = () => {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -16,6 +17,7 @@ export const HomePage: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [subjectMaterials, setSubjectMaterials] = useState<Material[]>([]);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
 
   const groupId = 1;
   const userName = "John Doe";
@@ -91,26 +93,14 @@ export const HomePage: React.FC = () => {
 
   const handleSubjectClick = async (subject: Subject) => {
     setSelectedSubject(subject);
+    setSelectedMaterial(null);  // close any open material when switching subjects
     setIsLoadingDetails(true);
     try {
-      const response = await subjectApi.getSubject(groupId, subject.id);
-      const subjectData = (response as any).data || response;
-      const materialRefs = subjectData.materials || [];
-
-      const detailedMaterials = await Promise.all(
-        materialRefs.map(async (mat: any) => {
-          const matId = mat.id || mat;
-          try {
-            const res = await materialApi.getMaterial(groupId, matId);
-            return (res as any).data || res;
-          } catch (err) {
-            console.error(err);
-            return mat;
-          }
-        })
-      );
-
-      setSubjectMaterials(detailedMaterials);
+      // Use the dedicated list endpoint — `subject.materials` from getSubject
+      // is the unloaded SQLAlchemy relationship and arrives empty.
+      const res = await materialApi.listBySubject(groupId, subject.id);
+      const data = (res as any).data || res;
+      setSubjectMaterials(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
       setSubjectMaterials([]);
@@ -202,6 +192,24 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
         </div>
+      ) : selectedMaterial ? (
+        // ─── A material is open: AI flow takes over the right pane ───
+        <div style={{
+          border: "1px solid rgba(0, 0, 0, 0.1)",
+          borderRadius: "1.2rem",
+          margin: "0.5rem",
+          background: "#ebebd3",
+          height: "92vh",
+          width: "78vw",
+          boxSizing: "border-box",
+        }}>
+          <MaterialDetailView
+            groupId={groupId}
+            materialId={(selectedMaterial as any).id}
+            materialName={(selectedMaterial as any).name || 'Document'}
+            onBack={() => setSelectedMaterial(null)}
+          />
+        </div>
       ) : (
         <>
           <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", height: "92vh", width: "60vw", padding: "2rem", boxSizing: "border-box", overflowY: "auto" }}>
@@ -230,16 +238,29 @@ export const HomePage: React.FC = () => {
                 <p>Loading materials...</p>
               ) : subjectMaterials.length > 0 ? (
                 subjectMaterials.map((material, index) => (
-                  <div key={(material as any).id || index} style={{
-                    padding: "1rem",
-                    backgroundColor: "white",
-                    borderRadius: "0.8rem",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between"
-                  }}>
-                    <span style={{ fontWeight: "bold", color: "#444" }}>{(material as any).name || 'Document'}</span>
+                  <div
+                    key={(material as any).id || index}
+                    onClick={() => setSelectedMaterial(material)}
+                    style={{
+                      padding: "1rem",
+                      backgroundColor: "white",
+                      borderRadius: "0.8rem",
+                      boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      cursor: "pointer",
+                      transition: "transform 0.1s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateX(4px)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "translateX(0)"; }}
+                  >
+                    <span style={{ fontWeight: "bold", color: "#444" }}>
+                      📄 {(material as any).name || 'Document'}
+                    </span>
+                    <span style={{ fontSize: "0.85rem", color: "#888" }}>
+                      Open AI flow →
+                    </span>
                   </div>
                 ))
               ) : (

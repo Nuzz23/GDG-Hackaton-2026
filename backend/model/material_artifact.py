@@ -11,6 +11,10 @@ class ArtifactType(enum.Enum):
     KEYWORD = "keyword"
     NOTE = "note"
     QUESTION = "question"
+    # AI-agent outputs (Learn Different track):
+    INDEX = "index"      # processing_agent.IndexOutput per material (one per material, latest wins)
+    QUIZ = "quiz"        # quiz_creation_agent.QuizOutput (one per generation request)
+    TRACE = "trace"      # eval_agent.TraceEvent (one per evaluation turn)
 
 class MaterialArtifact(Base):
     """Artifacts associated with a material (highlights, mindmaps, keywords, etc.)"""

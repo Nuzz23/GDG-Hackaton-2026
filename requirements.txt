@@ -1,0 +1,24 @@
+# Core graph
+langgraph>=0.2.50
+langchain-core>=0.3.20
+langchain-google-genai>=2.0.5
+
+# Data validation
+pydantic>=2.7.0
+
+# Format parsers
+pymupdf>=1.24.0          # PDF
+python-pptx>=1.0.0       # PPTX
+markdown-it-py>=3.0.0    # Markdown
+
+# ASR (audio / video)
+faster-whisper>=1.0.0
+# ffmpeg must be on PATH for video inputs (not a pip dep).
+
+# Language detection (text formats)
+lingua-language-detector>=2.0.0
+# langdetect is the fallback if lingua isn't available.
+langdetect>=1.0.9
+
+# Optional: auto-load GOOGLE_API_KEY from a .env file at the project root.
+python-dotenv>=1.0.0
