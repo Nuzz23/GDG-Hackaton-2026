@@ -372,8 +372,21 @@ export const HomePage: React.FC = () => {
 
           <hr style={{ width: "100%", border: "none", height: "2px", margin: "0", marginBottom: "0.5rem", background: "rgba(0, 0, 0, 0.1)" }} />
 
-          <div style={{ padding: "0 1rem", fontSize: 11, color: "#789", marginBottom: 8, wordBreak: "break-word" }}>
-            {matIndex.source.filename} · {matIndex.source.language}
+          {/* Filename header — biggest title in this column (bigger than the
+              user name and the "Index" sub-title), bold + underlined. */}
+          <div style={{
+            padding: "0.4rem 1rem 0.8rem",
+            fontSize: "1.25rem", fontWeight: 800,
+            textDecoration: "underline", textUnderlineOffset: "3px",
+            color: "#222", wordBreak: "break-word",
+          }}>
+            {matIndex.source.filename}
+            <span style={{
+              fontSize: "0.75rem", fontWeight: 600, color: "#789",
+              textDecoration: "none", marginLeft: 6,
+            }}>
+              · {matIndex.source.language}
+            </span>
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: "0 1rem 1rem" }}>

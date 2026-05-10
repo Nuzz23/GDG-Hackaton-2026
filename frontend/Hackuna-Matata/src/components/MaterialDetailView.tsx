@@ -49,12 +49,16 @@ type Phase = 'idle' | 'indexing' | 'index_ready';
  */
 export function MaterialDetailView(props: MaterialDetailViewProps) {
   const {
-    groupId, materialId, materialName, onBack,
+    groupId, materialId,
     index, onIndexLoaded,
     currentNodeId, onCurrentNodeChange,
     scrollTargetId,
     onOpenQuiz, canOpenQuiz,
   } = props;
+  // materialName + onBack are accepted by the interface for parent
+  // compatibility but no longer rendered — back navigation lives in the
+  // left sidebar's avatar row now.
+  void props.materialName; void props.onBack;
 
   const [phase, setPhase] = useState<Phase>(index ? 'index_ready' : 'idle');
   const [error, setError] = useState<string | null>(null);
