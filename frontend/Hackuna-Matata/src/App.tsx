@@ -46,17 +46,12 @@ function App() {
           />*/}
 
           <Route 
-            path="/home" 
+            path="/" 
             element={
               //<ProtectedRoute>
                 <HomePage />
               //</ProtectedRoute>
             } 
-          />
-          
-          <Route 
-            path="*" 
-            element={<Navigate to={isAuthenticated ? "/groups" : "/login"} replace />} 
           />
         </Routes>
       </main>

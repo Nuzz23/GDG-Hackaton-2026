@@ -5,3 +5,17 @@ psycopg2-binary
 sqlalchemy
 alembic
 python-dotenv
+
+# AI agent dependencies (Learn Different track) — imported in-process by
+# service/agentService.py. These are duplicated in each agent's own
+# requirements.txt by design (hackathon redundancy over DRY); when the
+# agents are imported here, the deduplicated set lands in the backend venv.
+langgraph>=0.2.50
+langchain-core>=0.3.20
+langchain-google-genai>=2.0.5
+pymupdf>=1.24.0
+python-pptx>=1.0.0
+markdown-it-py>=3.0.0
+faster-whisper>=1.0.0
+lingua-language-detector>=2.0.0
+langdetect>=1.0.9

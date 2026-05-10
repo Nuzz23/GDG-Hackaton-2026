@@ -3,6 +3,7 @@ import { useGroups } from '../hooks/useGroups';
 import '../styles/GroupPage.css';
 import { subjectApi, materialApi } from '@/services/api';
 import type { Subject, Material } from '@/types/apiTypes';
+import { MaterialDetailView } from '@/components/MaterialDetailView';
 
 export const HomePage: React.FC = () => {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -16,8 +17,9 @@ export const HomePage: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [subjectMaterials, setSubjectMaterials] = useState<Material[]>([]);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
 
-  const groupId = 1; 
+  const groupId = 1;
   const userName = "John Doe";
 
   const fetchSubjects = async () => {
@@ -178,24 +180,42 @@ export const HomePage: React.FC = () => {
 
       {!selectedSubject ? (
         <div style={{
-          border: "1px solid rgba(0, 0, 0, 0.1)", 
-          borderRadius: "1.2rem", 
-          margin: "0.5rem", 
-          background: "#ebebd3", 
-          display: "flex", 
-          flexDirection: "column", 
-          alignItems: "center", 
-          justifyContent: "center", 
-          height: "92vh", 
-          width: "78vw" 
+          border: "1px solid rgba(0, 0, 0, 0.1)",
+          borderRadius: "1.2rem",
+          margin: "0.5rem",
+          background: "#ebebd3",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "92vh",
+          width: "78vw"
         }}>
           <h2>Choose a subject to start</h2>
+        </div>
+      ) : selectedMaterial ? (
+        // ─── A material is open: AI flow takes over the right pane ───
+        <div style={{
+          border: "1px solid rgba(0, 0, 0, 0.1)",
+          borderRadius: "1.2rem",
+          margin: "0.5rem",
+          background: "#ebebd3",
+          height: "92vh",
+          width: "78vw",
+          boxSizing: "border-box",
+        }}>
+          <MaterialDetailView
+            groupId={groupId}
+            materialId={(selectedMaterial as any).id}
+            materialName={(selectedMaterial as any).name || 'Document'}
+            onBack={() => setSelectedMaterial(null)}
+          />
         </div>
       ) : (
         <>
           <div style={{border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", height: "92vh", width: "60vw", padding: "2rem", boxSizing: "border-box", overflowY: "auto" }}>
             <h1 style={{ marginBottom: "2rem", color: "#333" }}>{selectedSubject.name}</h1>
-            
+
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <h3 style={{ margin: 0, color: "#555" }}>Materials</h3>
@@ -206,7 +226,7 @@ export const HomePage: React.FC = () => {
                     onChange={handleUploadNewMaterial}
                     style={{ display: "none" }}
                   />
-                  <button 
+                  <button
                     onClick={() => document.getElementById('inner-file-upload')?.click()}
                     style={{ padding: "0.5rem 1rem", cursor: "pointer" }}
                   >
@@ -214,21 +234,34 @@ export const HomePage: React.FC = () => {
                   </button>
                 </div>
               </div>
-              
+
               {isLoadingDetails ? (
                 <p>Loading materials...</p>
               ) : subjectMaterials.length > 0 ? (
                 subjectMaterials.map((material, index) => (
-                  <div key={(material as any).id || index} style={{
-                    padding: "1rem",
-                    backgroundColor: "white",
-                    borderRadius: "0.8rem",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between"
-                  }}>
-                    <span style={{ fontWeight: "bold", color: "#444" }}>{(material as any).name || 'Document'}</span>
+                  <div
+                    key={(material as any).id || index}
+                    onClick={() => setSelectedMaterial(material)}
+                    style={{
+                      padding: "1rem",
+                      backgroundColor: "white",
+                      borderRadius: "0.8rem",
+                      boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      cursor: "pointer",
+                      transition: "transform 0.1s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateX(4px)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "translateX(0)"; }}
+                  >
+                    <span style={{ fontWeight: "bold", color: "#444" }}>
+                      📄 {(material as any).name || 'Document'}
+                    </span>
+                    <span style={{ fontSize: "0.85rem", color: "#888" }}>
+                      Open AI flow →
+                    </span>
                   </div>
                 ))
               ) : (
