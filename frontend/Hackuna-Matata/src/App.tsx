@@ -6,6 +6,7 @@ import { GroupsPage } from '@/pages/GroupPages';
 import { Navbar } from '@/components/Navbar';
 
 import './App.css';
+import { HomePage } from './pages/HomePage';
 
 // Helper protecting routes that require authentication
 /*
@@ -34,12 +35,21 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           */}
 
-          {/* Protected routes */}
+          {/* Protected routes 
           <Route 
             path="/groups" 
             element={
               //<ProtectedRoute>
                 <GroupsPage />
+              //</ProtectedRoute>
+            } 
+          />*/}
+
+          <Route 
+            path="/home" 
+            element={
+              //<ProtectedRoute>
+                <HomePage />
               //</ProtectedRoute>
             } 
           />

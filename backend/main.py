@@ -47,3 +47,13 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"], # Or ["*"] for everything (less secure)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

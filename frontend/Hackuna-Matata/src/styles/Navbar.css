@@ -4,16 +4,14 @@
   align-items: center;
   width: 100%; /* Fondamentale: forza la navbar ad occupare tutto lo schermo */
   box-sizing: border-box; /* Fa in modo che il padding non allarghi la navbar oltre il 100% */
-  padding: 16px 32px;
-  background-color: #1f2937; /* Colore scuro basato sul tuo screenshot */
-  border-bottom: 1px solid #374151; /* Bordo inferiore leggermente più chiaro */
+  padding: 5px 16px 0;
   font-family: system-ui, -apple-system, sans-serif;
 }
 
 .navbar-brand {
   font-size: 24px;
   font-weight: 800;
-  color: #ffffff; /* Testo bianco per contrastare lo sfondo scuro */
+  color: #2f2f2f; /* Testo bianco per contrastare lo sfondo scuro */
   letter-spacing: -0.5px;
 }
 
