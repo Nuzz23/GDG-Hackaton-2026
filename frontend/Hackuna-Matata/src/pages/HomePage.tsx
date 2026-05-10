@@ -35,6 +35,19 @@ export const HomePage: React.FC = () => {
     fetchSubjects();
   }, []);
 
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedSubject(null);
+        setSelectedMaterial(null);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, []);
+
   const togglePopup = () => {
     setIsPopupOpen(!isPopupOpen);
     if (isPopupOpen) {
@@ -93,11 +106,9 @@ export const HomePage: React.FC = () => {
 
   const handleSubjectClick = async (subject: Subject) => {
     setSelectedSubject(subject);
-    setSelectedMaterial(null);  // close any open material when switching subjects
+    setSelectedMaterial(null);
     setIsLoadingDetails(true);
     try {
-      // Use the dedicated list endpoint — `subject.materials` from getSubject
-      // is the unloaded SQLAlchemy relationship and arrives empty.
       const res = await materialApi.listBySubject(groupId, subject.id);
       const data = (res as any).data || res;
       setSubjectMaterials(Array.isArray(data) ? data : []);
@@ -130,10 +141,16 @@ export const HomePage: React.FC = () => {
 
       <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", margin: "0.5rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", height: "92vh", width: "20vw", overflow: "hidden" }}>
 
-        <div style={{ width: "100%", padding: "1rem", textAlign: "center", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#333", fontSize: "1.2rem" }}>
-          {userName}
+        <div style={{ width: "100%", padding: "1.5rem 1.5rem 1rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", boxSizing: "border-box" }}>
+          <span style={{ fontWeight: "bold", color: "#333", fontSize: "1.5rem" }}>
+            {userName}
+          </span>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="#333" xmlns="http://www.w3.org/2000/svg" style={{ cursor: "pointer" }}>
+            <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.36 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.63 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z"/>
+          </svg>
         </div>
-        <hr style={{ width: "100%", border: "none", height: "2px",margin: "0", marginBottom: "0.5rem", background: "rgba(0, 0, 0, 0.1)" }} />
+        
+        <hr style={{ width: "100%", border: "none", height: "2px", margin: "0", marginBottom: "1rem", background: "rgba(0, 0, 0, 0.1)" }} />
 
         <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", flex: 1, overflowY: "auto", paddingBottom: "1rem" }}>
           {subjects.map((subject) => (
@@ -183,17 +200,16 @@ export const HomePage: React.FC = () => {
             </h2>
 
             <div style={{ display: "flex", flexDirection: "row", alignItems: "center"}}>
-              <button style={{ width: "16rem", height: "3rem", marginRight: "1rem", borderRadius: "0.8rem", background: "rgba(152, 76, 27)", color: "white", border: "none", fontSize: "1.2rem" }} onClick={togglePopup}>
+              <button style={{ width: "16rem", height: "3rem", marginRight: "1rem", borderRadius: "0.8rem", background: "rgba(152, 76, 27)", color: "white", border: "none", fontSize: "1.2rem", cursor: "pointer" }} onClick={togglePopup}>
                 Create new study session
               </button>
-              <button style={{ width: "16rem", height: "3rem", borderRadius: "0.8rem", background: "white", color: "black", border: "1px solid #ccc", fontSize: "1.2rem" }} onClick={togglePopup}>
+              <button style={{ width: "16rem", height: "3rem", borderRadius: "0.8rem", background: "white", color: "black", border: "1px solid #ccc", fontSize: "1.2rem", cursor: "pointer" }} onClick={togglePopup}>
                 Join a study session
               </button>
             </div>
           </div>
         </div>
       ) : selectedMaterial ? (
-        // ─── A material is open: AI flow takes over the right pane ───
         <div style={{
           border: "1px solid rgba(0, 0, 0, 0.1)",
           borderRadius: "1.2rem",
@@ -212,7 +228,7 @@ export const HomePage: React.FC = () => {
         </div>
       ) : (
         <>
-          <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", height: "92vh", width: "60vw", padding: "2rem", boxSizing: "border-box", overflowY: "auto" }}>
+          <div style={{ border: "1px solid rgba(0, 0, 0, 0.1)", borderRadius: "1.2rem", background: "#ebebd3", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", height: "92vh", width: "60vw",  boxSizing: "border-box", overflowY: "auto", margin: "0.5rem" }}>
             <h1 style={{ marginBottom: "2rem", color: "#333" }}>{selectedSubject.name}</h1>
 
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -273,6 +289,7 @@ export const HomePage: React.FC = () => {
           </div>
         </>
       )}
+      
 
       {isPopupOpen && (
         <div style={{
