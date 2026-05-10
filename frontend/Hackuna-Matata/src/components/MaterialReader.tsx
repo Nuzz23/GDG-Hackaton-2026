@@ -114,6 +114,14 @@ export function MaterialReader({
                 fontWeight: 700,
               }}
             >
+              {item.numbering && (
+                <span style={{
+                  color: '#789', fontWeight: 600, marginRight: '0.5em',
+                  fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {item.numbering}
+                </span>
+              )}
               {item.label}
             </Tag>
           );

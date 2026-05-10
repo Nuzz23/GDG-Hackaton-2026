@@ -17,7 +17,7 @@ the existing `artifactController` style.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, UploadFile
 from pydantic import BaseModel
@@ -63,7 +63,11 @@ def get_latest_index(material_id: int):
 
 
 class QuizRequest(BaseModel):
-    node_id: str
+    # Either `node_id` (legacy single-node) or `node_ids` (multi-node).
+    # The frontend always sends `node_ids` now; `node_id` is kept for
+    # backwards compatibility with anything that still calls the old shape.
+    node_id: Optional[str] = None
+    node_ids: Optional[List[str]] = None
     item_type: str  # "f" | "mcq" | "qa"
     n: int
     difficulty: str = "medium"  # "easy" | "medium" | "hard"
@@ -74,6 +78,7 @@ def generate_quiz(material_id: int, body: QuizRequest):
     return agent_service.generate_quiz(
         material_id=material_id,
         node_id=body.node_id,
+        node_ids=body.node_ids,
         item_type=body.item_type,
         n=body.n,
         difficulty=body.difficulty,

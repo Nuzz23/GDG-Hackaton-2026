@@ -1,23 +1,41 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { HierarchyNode } from '@/types/apiTypes';
 import { nodeTitle } from '@/utils/nodeTitle';
+import { computeNumbering } from '@/utils/treeWalk';
 
 interface IndexTreeProps {
   node: HierarchyNode;
   depth?: number;
   selectedNodeId: string | null;
   onSelect: (node: HierarchyNode) => void;
+  /** Numbering map keyed by node_id. Computed at the top-level call from
+   *  the root and threaded through recursive calls — recomputing per
+   *  recursion would lose the global ordering. */
+  numbering?: Map<string, string>;
 }
 
 /** Recursive collapsible tree view of an IndexOutput.
  *  Internal nodes are clickable + expandable; leaf paragraphs show a snippet. */
-export function IndexTree({ node, depth = 0, selectedNodeId, onSelect }: IndexTreeProps) {
+export function IndexTree({
+  node, depth = 0, selectedNodeId, onSelect, numbering,
+}: IndexTreeProps) {
   const [expanded, setExpanded] = useState(depth < 2);  // first two levels open by default
   const isLeaf = !node.children || node.children.length === 0;
   const isRoot = node.kind === 'root';
   const isSelected = node.node_id === selectedNodeId;
+  // Section-like nodes (anything that isn't a paragraph leaf) are bolded —
+  // indentation alone already conveys hierarchy, so we don't need a [kind] tag.
+  const isSection = node.kind !== 'paragraph';
+
+  // Compute the numbering map once at the top of the recursion if the
+  // caller didn't provide one; the same Map is then threaded down.
+  const resolvedNumbering = useMemo(
+    () => numbering ?? (isRoot ? computeNumbering(node) : new Map<string, string>()),
+    [numbering, isRoot, node],
+  );
 
   const indent = depth * 16;
+  const num = resolvedNumbering.get(node.node_id);
 
   // Root: skip rendering itself, only render children
   if (isRoot) {
@@ -30,6 +48,7 @@ export function IndexTree({ node, depth = 0, selectedNodeId, onSelect }: IndexTr
             depth={depth}
             selectedNodeId={selectedNodeId}
             onSelect={onSelect}
+            numbering={resolvedNumbering}
           />
         ))}
       </div>
@@ -65,12 +84,18 @@ export function IndexTree({ node, depth = 0, selectedNodeId, onSelect }: IndexTr
           </span>
         )}
         {isLeaf && <span style={{ minWidth: 12 }}>•</span>}
-        <span style={{ flex: 1 }}>
-          <span style={{
-            color: '#888', fontSize: 11, fontFamily: 'monospace', marginRight: 6,
-          }}>
-            [{node.kind}]
-          </span>
+        <span style={{
+          flex: 1,
+          fontWeight: isSection ? 600 : 400,
+          color: isSection ? '#222' : '#555',
+        }}>
+          {num && (
+            <span style={{
+              color: '#789', fontVariantNumeric: 'tabular-nums', marginRight: 6,
+            }}>
+              {num}
+            </span>
+          )}
           {nodeTitle(node)}
         </span>
       </div>
@@ -83,6 +108,7 @@ export function IndexTree({ node, depth = 0, selectedNodeId, onSelect }: IndexTr
               depth={depth + 1}
               selectedNodeId={selectedNodeId}
               onSelect={onSelect}
+              numbering={resolvedNumbering}
             />
           ))}
         </div>

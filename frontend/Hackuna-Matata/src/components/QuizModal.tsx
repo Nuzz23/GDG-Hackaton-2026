@@ -1,17 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { agentApi } from '@/services/api';
 import type {
   Difficulty, HierarchyNode, ItemTypeCode, QuizOutput,
 } from '@/types/apiTypes';
 import { QuizPlayer } from './QuizPlayer';
-import { nodeTitle } from '@/utils/nodeTitle';
+import { flattenForPicker, collectSubtreeIds, type PickerEntry } from '@/utils/treeWalk';
 
 interface QuizModalProps {
   isOpen: boolean;
   onClose: () => void;
   materialId: number;
-  /** The node the quiz will be generated on. The reader feeds the
-   *  currently-visible chapter/section here. */
+  /** The full index tree — used to populate the section/paragraph picker.
+   *  Required so the user can override the auto-detected target. */
+  tree: HierarchyNode | null;
+  /** The node the quiz will be generated on by default — the reader feeds
+   *  the currently-visible chapter/section here. The user can still pick
+   *  a different node (or "All document") from the picker. */
   targetNode: HierarchyNode | null;
 }
 
@@ -26,7 +30,7 @@ type Phase = 'form' | 'generating' | 'playing' | 'error';
  * The "target node" is fixed when the modal opens, so the user can keep
  * reading other parts of the doc behind the modal without losing context.
  */
-export function QuizModal({ isOpen, onClose, materialId, targetNode }: QuizModalProps) {
+export function QuizModal({ isOpen, onClose, materialId, tree, targetNode }: QuizModalProps) {
   const [phase, setPhase] = useState<Phase>('form');
   const [error, setError] = useState<string | null>(null);
   const [quiz, setQuiz] = useState<QuizOutput | null>(null);
@@ -36,29 +40,69 @@ export function QuizModal({ isOpen, onClose, materialId, targetNode }: QuizModal
   const [n, setN] = useState(3);
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
 
+  // Picker entries — root ("All document") + all sections + paragraph leaves.
+  const pickerEntries = useMemo(
+    () => (tree ? flattenForPicker(tree) : []),
+    [tree],
+  );
+
+  // The set of nodes the quiz will be generated on. Multi-select: the user
+  // can tick any combination of sections and/or paragraphs. The backend
+  // dedups ancestors, so it's harmless to leave a parent + its child both
+  // checked, but the UX visually surfaces this so the user knows.
+  const [pickedNodeIds, setPickedNodeIds] = useState<Set<string>>(new Set());
+
   // Reset to form whenever the modal is reopened with a (possibly new)
-  // target node — we don't want stale quiz state lingering.
+  // target node — we don't want stale quiz state lingering. We also
+  // re-seed the picker selection from the new targetNode.
   useEffect(() => {
     if (isOpen) {
       setPhase('form');
       setError(null);
       setQuiz(null);
       setQuizArtifactId(null);
+      // Seed with the auto-detected target (or root as a fallback).
+      const seed = targetNode?.node_id ?? tree?.node_id ?? null;
+      setPickedNodeIds(seed ? new Set([seed]) : new Set());
     }
-  }, [isOpen, targetNode?.node_id]);
+  }, [isOpen, targetNode?.node_id, tree?.node_id]);
 
   if (!isOpen) return null;
 
+  /**
+   * Cascading toggle: clicking on a section ticks/unticks every node in
+   * its subtree (including the section itself). For paragraph leaves this
+   * collapses to a plain single-id toggle.
+   *
+   * If every id in the subtree is already in the set → uncheck them all.
+   * Otherwise (none or partial) → check them all. This makes
+   * "click on All document" select everything for free.
+   */
+  const toggleSubtree = (node: HierarchyNode) => {
+    const ids = collectSubtreeIds(node);
+    if (ids.length === 0) return;
+    setPickedNodeIds((prev) => {
+      const next = new Set(prev);
+      const allChecked = ids.every((id) => next.has(id));
+      if (allChecked) {
+        ids.forEach((id) => next.delete(id));
+      } else {
+        ids.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
   const runGeneration = async () => {
-    if (!targetNode) {
-      setError('No target node selected.');
+    if (pickedNodeIds.size === 0) {
+      setError('Pick at least one section or paragraph to quiz on.');
       return;
     }
     setError(null);
     setPhase('generating');
     try {
       const r = await agentApi.generateQuiz(materialId, {
-        node_id: targetNode.node_id,
+        node_ids: Array.from(pickedNodeIds),
         item_type: itemType,
         n,
         difficulty,
@@ -105,7 +149,7 @@ export function QuizModal({ isOpen, onClose, materialId, targetNode }: QuizModal
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Mettimi alla prova</h2>
+          <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Test my knowledges</h2>
           <button
             onClick={onClose}
             style={{
@@ -118,24 +162,16 @@ export function QuizModal({ isOpen, onClose, materialId, targetNode }: QuizModal
           </button>
         </div>
 
-        {/* Target indicator — always visible */}
-        {targetNode && (
-          <div style={{
-            padding: 10, background: '#eef5fc', borderRadius: 6,
-            fontSize: 13, color: '#356',
-          }}>
-            <div style={{ fontSize: 11, color: '#789' }}>Quiz on</div>
-            <div style={{ fontWeight: 600 }}>{nodeTitle(targetNode, 100)}</div>
-          </div>
-        )}
-
         {phase === 'form' && (
           <FormPhase
+            entries={pickerEntries}
+            pickedNodeIds={pickedNodeIds}
+            toggleSubtree={toggleSubtree}
             itemType={itemType} setItemType={setItemType}
             n={n} setN={setN}
             difficulty={difficulty} setDifficulty={setDifficulty}
             onGenerate={runGeneration}
-            disabled={!targetNode}
+            disabled={pickedNodeIds.size === 0}
           />
         )}
 
@@ -178,16 +214,100 @@ export function QuizModal({ isOpen, onClose, materialId, targetNode }: QuizModal
 
 // ─── Sub-components ────────────────────────────────────────────────────────
 
+/**
+ * One row of the scope picker. Displays a tri-state checkbox:
+ *   - checked       → every node in this subtree is selected
+ *   - indeterminate → some, but not all, nodes in this subtree are selected
+ *   - unchecked     → nothing in this subtree is selected
+ *
+ * Indeterminate is a DOM-only property (no HTML attribute), so we set it
+ * imperatively via a ref. `onToggle` cascades the click to the whole subtree.
+ */
+function PickerRow({
+  entry, picked, onToggle,
+}: {
+  entry: PickerEntry;
+  picked: Set<string>;
+  onToggle: () => void;
+}) {
+  // Compute subtree-wide check state.
+  const subtreeIds = useMemo(() => collectSubtreeIds(entry.node), [entry.node]);
+  const total = subtreeIds.length;
+  const inSet = subtreeIds.reduce((acc, id) => acc + (picked.has(id) ? 1 : 0), 0);
+  const checked = total > 0 && inSet === total;
+  const indeterminate = inSet > 0 && inSet < total;
+
+  // Indent proportionally to depth so the hierarchy is visible at a glance.
+  const pad = entry.isRoot ? 0 : Math.max(0, entry.depth - 1) * 14;
+
+  return (
+    <label
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '3px 4px', paddingLeft: 4 + pad,
+        borderRadius: 3, cursor: 'pointer',
+        background: checked ? '#e8f4fd' : indeterminate ? '#f3f8fc' : 'transparent',
+        fontWeight: entry.isRoot ? 700 : (entry.node.kind !== 'paragraph' ? 600 : 400),
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        ref={(el) => { if (el) el.indeterminate = indeterminate; }}
+        onChange={onToggle}
+        style={{ flexShrink: 0 }}
+      />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {entry.isRoot ? '📄 ' : ''}{entry.label.replace(/^\s+/, '')}
+      </span>
+    </label>
+  );
+}
+
+
 function FormPhase(props: {
+  entries: PickerEntry[];
+  pickedNodeIds: Set<string>;
+  toggleSubtree: (node: HierarchyNode) => void;
   itemType: ItemTypeCode; setItemType: (v: ItemTypeCode) => void;
   n: number; setN: (v: number) => void;
   difficulty: Difficulty; setDifficulty: (v: Difficulty) => void;
   onGenerate: () => void;
   disabled: boolean;
 }) {
-  const { itemType, setItemType, n, setN, difficulty, setDifficulty, onGenerate, disabled } = props;
+  const {
+    entries, pickedNodeIds, toggleSubtree,
+    itemType, setItemType, n, setN, difficulty, setDifficulty, onGenerate, disabled,
+  } = props;
   return (
     <>
+      <div>
+        <label style={lbl}>
+          Scope <span style={{ color: '#789', fontWeight: 400 }}>· tick a section to include everything below it</span>
+        </label>
+        <div style={{
+          maxHeight: 240, overflowY: 'auto',
+          border: '1px solid #ccc', borderRadius: 4, padding: 8,
+          background: '#fafbfc', fontSize: 13,
+        }}>
+          {entries.length === 0 && (
+            <div style={{ color: '#789', fontStyle: 'italic' }}>(no index loaded)</div>
+          )}
+          {entries.map((e) => (
+            <PickerRow
+              key={e.node.node_id}
+              entry={e}
+              picked={pickedNodeIds}
+              onToggle={() => toggleSubtree(e.node)}
+            />
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: '#789', marginTop: 4 }}>
+          Cascading: ticking a section auto-selects every paragraph below it.
+          A square inside the box ▣ means partial selection within that subtree.
+        </div>
+      </div>
       <div>
         <label style={lbl}>Type</label>
         <select value={itemType} onChange={(e) => setItemType(e.target.value as ItemTypeCode)} style={ctrl}>
@@ -211,7 +331,7 @@ function FormPhase(props: {
       </div>
       <button onClick={onGenerate} disabled={disabled}
               style={{ ...btn('#27ae60'), padding: '12px 20px', fontSize: 15 }}>
-        Generate
+        Generate ({pickedNodeIds.size} selected)
       </button>
     </>
   );

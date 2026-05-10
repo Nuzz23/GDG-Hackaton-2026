@@ -118,10 +118,22 @@ export const agentApi = {
       `/v1/material/${materialId}/agent/index`,
     ),
 
-  /** Generate quiz items from a node of the latest index. */
+  /** Generate quiz items from one or more nodes of the latest index.
+   *
+   * Pass `node_ids: string[]` for multi-section quizzes (the backend will
+   * concatenate the text of the selected nodes, with ancestor dedup so a
+   * section + one of its paragraphs never produces duplicate input).
+   * `node_id` is the legacy single-node form — still accepted by the API
+   * but `node_ids` is preferred. */
   generateQuiz: (
     materialId: number,
-    body: { node_id: string; item_type: ItemTypeCode; n: number; difficulty?: Difficulty },
+    body: {
+      node_id?: string;
+      node_ids?: string[];
+      item_type: ItemTypeCode;
+      n: number;
+      difficulty?: Difficulty;
+    },
   ) =>
     apiClient.post<QuizResponse>(
       `/v1/material/${materialId}/agent/quiz`,

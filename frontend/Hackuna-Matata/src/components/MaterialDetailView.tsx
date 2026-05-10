@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { agentApi } from '@/services/api';
-import type { HierarchyNode, IndexOutput } from '@/types/apiTypes';
+import type { IndexOutput } from '@/types/apiTypes';
 import { MaterialReader } from './MaterialReader';
-import { QuizModal } from './QuizModal';
-import { findPath, nearestSectionAncestor, pathLabels } from '@/utils/treeWalk';
+import { findPath, pathLabels } from '@/utils/treeWalk';
 
 interface MaterialDetailViewProps {
   groupId: number;
@@ -23,6 +22,13 @@ interface MaterialDetailViewProps {
 
   /** When HomePage's tree-click sets this, the reader scrolls to it. */
   scrollTargetId: string | null;
+
+  /** Opens the QuizModal (lifted up to HomePage so the modal can overlay
+   *  the whole page; we just trigger it from the right Session panel). */
+  onOpenQuiz: () => void;
+  /** Whether the quiz button is enabled (false until an index is loaded
+   *  and a target node has been resolved). */
+  canOpenQuiz: boolean;
 }
 
 type Phase = 'idle' | 'indexing' | 'index_ready';
@@ -46,11 +52,11 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
     index, onIndexLoaded,
     currentNodeId, onCurrentNodeChange,
     scrollTargetId,
+    onOpenQuiz, canOpenQuiz,
   } = props;
 
   const [phase, setPhase] = useState<Phase>(index ? 'index_ready' : 'idle');
   const [error, setError] = useState<string | null>(null);
-  const [quizOpen, setQuizOpen] = useState(false);
 
   // On mount (or when materialId changes) try to load an existing index.
   // If HomePage already has it cached we skip the fetch.
@@ -87,20 +93,15 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
     }
   };
 
-  // Path from root to the currently-visible heading (used for breadcrumb
-  // and for promoting paragraph leaves to their nearest section ancestor
-  // when the user opens the quiz modal).
+  // Path from root to the currently-visible heading — used here only for
+  // the breadcrumb. The "Test my knowledges" button + QuizModal now live
+  // in HomePage so the trigger can sit at the bottom of the Index sidebar.
   const currentPath = useMemo(() => {
     if (!index?.tree || !currentNodeId) return null;
     return findPath(index.tree, currentNodeId);
   }, [index, currentNodeId]);
 
   const breadcrumb = useMemo(() => pathLabels(currentPath), [currentPath]);
-
-  const quizTargetNode: HierarchyNode | null = useMemo(() => {
-    if (!currentPath) return null;
-    return nearestSectionAncestor(currentPath);
-  }, [currentPath]);
 
   return (
     <div style={{
@@ -178,33 +179,16 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
             {/* Breadcrumb header */}
             <div style={{
               padding: '14px 18px', borderBottom: '1px solid #eef0f2',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              gap: 12, flexWrap: 'wrap',
             }}>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 11, color: '#789', textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                  Currently reading
-                </div>
-                <div style={{
-                  fontSize: 14, color: '#234', fontWeight: 600,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {breadcrumb.length > 0 ? breadcrumb.join(' › ') : '—'}
-                </div>
+              <div style={{ fontSize: 11, color: '#789', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                Currently reading
               </div>
-              <button
-                onClick={() => setQuizOpen(true)}
-                disabled={!quizTargetNode}
-                style={{
-                  padding: '10px 18px', fontSize: 14, fontWeight: 600,
-                  background: quizTargetNode ? '#27ae60' : '#a8c9b3',
-                  color: 'white', border: 'none', borderRadius: 6,
-                  cursor: quizTargetNode ? 'pointer' : 'not-allowed',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Mettimi alla prova
-              </button>
+              <div style={{
+                fontSize: 14, color: '#234', fontWeight: 600,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {breadcrumb.length > 0 ? breadcrumb.join(' › ') : '—'}
+              </div>
             </div>
 
             {/* Reader */}
@@ -217,35 +201,52 @@ export function MaterialDetailView(props: MaterialDetailViewProps) {
             </div>
           </div>
 
-          {/* ── Right: side panel placeholder ──────────── */}
+          {/* ── Right: Session side panel (with quiz CTA at the bottom) ── */}
           <div style={{
             background: 'white', border: '1px solid #e6e8eb', borderRadius: 10,
-            padding: 14, overflowY: 'auto', minHeight: 0,
+            display: 'flex', flexDirection: 'column', minHeight: 0,
           }}>
-            <h3 style={{ marginTop: 0, fontSize: '0.95rem' }}>Session</h3>
-            <p style={{ fontSize: 12, color: '#789', lineHeight: 1.5 }}>
-              Scroll through the material and use <b>Mettimi alla prova</b>
-              {' '}to generate a quiz on the section you're currently reading.
-            </p>
+            <div style={{ padding: 14, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+              <h3 style={{ marginTop: 0, fontSize: '0.95rem' }}>Session</h3>
+              <p style={{ fontSize: 12, color: '#789', lineHeight: 1.5 }}>
+                Scroll through the material — the breadcrumb above and the
+                index on the left both track your position.
+              </p>
+              <div style={{
+                marginTop: 16, padding: 10, background: '#f5f8fb',
+                borderRadius: 6, fontSize: 11, color: '#456',
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Tip</div>
+                The quiz scope defaults to the section currently in view.
+                The button below opens a popup where you can also pick a
+                different section, a paragraph, or the whole document.
+              </div>
+            </div>
+
+            {/* Sticky bottom CTA — almost as wide as the panel, height 59px. */}
             <div style={{
-              marginTop: 16, padding: 10, background: '#f5f8fb',
-              borderRadius: 6, fontSize: 11, color: '#456',
+              padding: '0.5rem 0.75rem 0.75rem',
+              borderTop: '1px solid rgba(0,0,0,0.08)',
+              flexShrink: 0,
             }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Tip</div>
-              The quiz target follows the heading currently in view — change
-              section by scrolling, then hit the green button.
+              <button
+                onClick={onOpenQuiz}
+                disabled={!canOpenQuiz}
+                style={{
+                  width: '100%', height: 59, borderRadius: '0.7rem',
+                  background: canOpenQuiz ? '#27ae60' : '#a8c9b3',
+                  color: 'white', border: 'none',
+                  fontSize: '1rem', fontWeight: 700,
+                  cursor: canOpenQuiz ? 'pointer' : 'not-allowed',
+                }}
+              >
+                Test my knowledges
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Quiz modal — overlays everything ──────────────── */}
-      <QuizModal
-        isOpen={quizOpen}
-        onClose={() => setQuizOpen(false)}
-        materialId={materialId}
-        targetNode={quizTargetNode}
-      />
     </div>
   );
 }

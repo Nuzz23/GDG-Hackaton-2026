@@ -188,38 +188,80 @@ class AgentService:
     def generate_quiz(
         self,
         material_id: int,
-        node_id: str,
         item_type: str,
         n: int,
+        node_id: Optional[str] = None,
+        node_ids: Optional[list[str]] = None,
         difficulty: str = "medium",
     ) -> dict[str, Any]:
-        """Generate quiz items for a node of the latest INDEX artifact.
+        """Generate quiz items from one or more nodes of the latest index.
 
-        We materialise the index to a temp file because the quiz_creation_agent
-        CLI/orchestrator takes a path. Cheaper than refactoring its API surface
-        for in-memory input on a hackathon timeline.
+        Two input modes:
+          * single node — pass `node_id`. We materialise the full index to a
+            temp .json and call the agent with `node_id=...`, so the resulting
+            SourceRef is fully populated (label, locator, …).
+          * multiple nodes — pass `node_ids`. We resolve & ancestor-dedup the
+            selection (see `_ancestor_ids`), concatenate the leaf text of the
+            survivors, and feed it to the agent as a temp .txt file. The
+            agent's raw-text path is used so we don't have to invent a fake
+            node_id; the SourceRef will be partial (no node_id/locator), which
+            is the right thing for a multi-section quiz.
         """
-        index_payload = self._latest_index_payload(material_id)
-        node = self._find_node(index_payload.get("tree", {}), node_id)
-        if node is None:
+        # Normalise input → ordered list of unique ids.
+        ids: list[str]
+        if node_ids:
+            ids = []
+            seen: set[str] = set()
+            for nid in node_ids:
+                if nid and nid not in seen:
+                    ids.append(nid)
+                    seen.add(nid)
+        elif node_id:
+            ids = [node_id]
+        else:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"node_id {node_id!r} not found in the latest index",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Provide either node_id or node_ids[].",
             )
 
-        # Upfront text-length validation: if the selected node has too little
-        # text, the LLM will correctly refuse to generate items and we'd
-        # waste an API call. Fail fast with a clear message instead.
-        text_len = self._collect_node_text_len(node)
-        if text_len < _MIN_NODE_TEXT_CHARS:
+        index_payload = self._latest_index_payload(material_id)
+        tree = index_payload.get("tree", {})
+
+        # Resolve every requested id; complain about the first one that's missing.
+        resolved: list[tuple[str, dict]] = []
+        for nid in ids:
+            node = self._find_node(tree, nid)
+            if node is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"node_id {nid!r} not found in the latest index",
+                )
+            resolved.append((nid, node))
+
+        # Drop any selection whose ancestor is also selected — its text is
+        # already covered by the ancestor's leaf-concatenation, including both
+        # would feed duplicate content to the LLM.
+        selected_set = {nid for nid, _ in resolved}
+        keep: list[tuple[str, dict]] = []
+        for nid, node in resolved:
+            ancestors = self._ancestor_ids(tree, nid) or set()
+            if ancestors & selected_set:
+                continue  # an ancestor of this node is also in the selection
+            keep.append((nid, node))
+        if not keep:
+            keep = resolved[:1]  # paranoid fallback; shouldn't trigger
+
+        # Combined-text length gate — same threshold as the single-node path.
+        total_len = sum(self._collect_node_text_len(node) for _, node in keep)
+        if total_len < _MIN_NODE_TEXT_CHARS:
+            picked_label = ", ".join(nid for nid, _ in keep)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    f"The selected node has only {text_len} characters of text — "
-                    f"too little for the LLM to generate meaningful items "
-                    f"(minimum: {_MIN_NODE_TEXT_CHARS} chars). "
-                    "Try selecting a longer paragraph, or a parent section/chapter "
-                    "(which aggregates the text of all its leaves)."
+                    f"The selected node(s) [{picked_label}] contain only "
+                    f"{total_len} characters of text — too little for the LLM "
+                    f"to generate meaningful items (minimum: {_MIN_NODE_TEXT_CHARS} chars). "
+                    "Try selecting more sections, or a parent chapter."
                 ),
             )
 
@@ -233,12 +275,28 @@ class AgentService:
                 detail=f"Invalid item_type or difficulty: {e}",
             )
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False, encoding="utf-8"
-        ) as tmp:
-            import json as _json
-            _json.dump(index_payload, tmp, ensure_ascii=False)
-            tmp_path = tmp.name
+        # Two paths to the agent — single-node keeps the rich SourceRef.
+        import json as _json
+        if len(keep) == 1 and node_ids is None:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", delete=False, encoding="utf-8",
+            ) as tmp:
+                _json.dump(index_payload, tmp, ensure_ascii=False)
+                tmp_path = tmp.name
+            agent_kwargs = {"node_id": keep[0][0]}
+        else:
+            combined = "\n\n".join(
+                t for t in (self._collect_node_text(node).strip() for _, node in keep) if t
+            )
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False, encoding="utf-8",
+            ) as tmp:
+                tmp.write(combined)
+                tmp_path = tmp.name
+            # No node_id in raw-text mode — agent treats input_path as plain text.
+            agent_kwargs = {
+                "language": (index_payload.get("source") or {}).get("language"),
+            }
 
         try:
             quiz_payload = generate_quiz_fn(
@@ -246,7 +304,7 @@ class AgentService:
                 item_type=it,
                 n=n,
                 difficulty=diff,
-                node_id=node_id,
+                **agent_kwargs,
             )
         except Exception as e:
             logger.exception("Quiz generation agent failed")
@@ -259,6 +317,13 @@ class AgentService:
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+        # Annotate the artifact with the requested scope so the artifact
+        # listing can show "quiz on N sections" rather than a single id.
+        if isinstance(quiz_payload, dict):
+            meta = quiz_payload.setdefault("metadata", {}) or {}
+            meta["requested_node_ids"] = [nid for nid, _ in keep]
+            quiz_payload["metadata"] = meta
 
         # The agent's defensive parsing returns a partial QuizOutput with
         # n_produced=0 instead of raising when the LLM call itself failed
@@ -475,6 +540,45 @@ class AgentService:
         if not children:
             return len((node.get("text") or "").strip())
         return sum(AgentService._collect_node_text_len(c) for c in children)
+
+    @staticmethod
+    def _collect_node_text(node: dict) -> str:
+        """Concatenate text of every leaf descendant of `node` in document order.
+
+        Mirrors quiz_creation_agent.extractor._collect_text — duplicated here
+        so the multi-node path can build the combined source text without
+        round-tripping through the agent's index.json reader.
+        """
+        if not isinstance(node, dict):
+            return ""
+        children = node.get("children") or []
+        if not children:
+            return (node.get("text") or "").strip()
+        pieces: list[str] = []
+        for c in children:
+            sub = AgentService._collect_node_text(c)
+            if sub:
+                pieces.append(sub)
+        return "\n\n".join(pieces)
+
+    @staticmethod
+    def _ancestor_ids(tree: dict, target_id: str, trail: tuple = ()) -> Optional[set]:
+        """Return the set of ancestor node_ids on the path to `target_id`.
+
+        Used to deduplicate user selections: if a section and one of its
+        descendants are both selected, we drop the descendant (its text is
+        already covered by the ancestor's concatenation, and including both
+        would produce duplicate content for the LLM).
+        """
+        if not isinstance(tree, dict):
+            return None
+        if tree.get("node_id") == target_id:
+            return set(trail)
+        for c in tree.get("children", []) or []:
+            r = AgentService._ancestor_ids(c, target_id, trail + (tree.get("node_id"),))
+            if r is not None:
+                return r
+        return None
 
     @staticmethod
     def _persist_uploaded_audio(material_id: int, audio: UploadFile) -> str:

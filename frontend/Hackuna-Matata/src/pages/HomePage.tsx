@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
 import '../styles/GroupPage.css';
 import { subjectApi, materialApi } from '@/services/api';
-import type { Subject, Material, IndexOutput } from '@/types/apiTypes';
+import type { Subject, Material, IndexOutput, HierarchyNode } from '@/types/apiTypes';
 import { MaterialDetailView } from '@/components/MaterialDetailView';
 import { IndexTree } from '@/components/IndexTree';
+import { QuizModal } from '@/components/QuizModal';
+import { findPath, nearestSectionAncestor, computeNumbering } from '@/utils/treeWalk';
 
 type SidebarMode = 'profile' | 'index';
 
@@ -28,9 +30,26 @@ export const HomePage: React.FC = () => {
   const [matIndex, setMatIndex] = useState<IndexOutput | null>(null);
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
   const [scrollTargetId, setScrollTargetId] = useState<string | null>(null);
+  const [quizOpen, setQuizOpen] = useState(false);
 
   const groupId = 1;
   const userName = "John Doe";
+
+  // The node the quiz will be generated on by default — closest non-paragraph
+  // ancestor of the heading currently in view. The QuizModal still lets the
+  // user override the scope via its own dropdown.
+  const quizTargetNode: HierarchyNode | null = useMemo(() => {
+    if (!matIndex?.tree || !currentNodeId) return matIndex?.tree ?? null;
+    const path = findPath(matIndex.tree, currentNodeId);
+    return nearestSectionAncestor(path ?? []) ?? matIndex.tree;
+  }, [matIndex, currentNodeId]);
+
+  // Numbering map for the whole tree — passed to IndexTree so every level
+  // of the recursion shares the same hierarchical numbering ("1.1.I.a").
+  const numbering = useMemo(
+    () => (matIndex?.tree ? computeNumbering(matIndex.tree) : new Map<string, string>()),
+    [matIndex],
+  );
 
   // Whenever we open/close a material, reset the document state and pick a
   // sensible sidebar mode (auto-flip to Index when a material is opened).
@@ -218,6 +237,26 @@ export const HomePage: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Sticky bottom CTA — opens the same popup used by the welcome
+              screen, so the user can spin up a new study session without
+              having to navigate away from the current document. */}
+          <div style={{
+            width: "100%", padding: "0.75rem 1rem 1rem",
+            borderTop: "1px solid rgba(0,0,0,0.08)", boxSizing: "border-box",
+            flexShrink: 0,
+          }}>
+            <button
+              onClick={togglePopup}
+              style={{
+                width: "100%", padding: "0.7rem", borderRadius: "0.7rem",
+                background: "rgba(152, 76, 27)", color: "white", border: "none",
+                fontSize: "0.95rem", fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              + Create new session
+            </button>
+          </div>
         </div>
       ) : (
         // ── Index sidebar: replaces the John Doe panel while reading. ──
@@ -252,6 +291,7 @@ export const HomePage: React.FC = () => {
               node={matIndex.tree}
               selectedNodeId={currentNodeId}
               onSelect={(n) => setScrollTargetId(n.node_id)}
+              numbering={numbering}
             />
           </div>
         </div>
@@ -306,6 +346,8 @@ export const HomePage: React.FC = () => {
             currentNodeId={currentNodeId}
             onCurrentNodeChange={setCurrentNodeId}
             scrollTargetId={scrollTargetId}
+            onOpenQuiz={() => setQuizOpen(true)}
+            canOpenQuiz={!!quizTargetNode}
           />
         </div>
       ) : (
@@ -471,6 +513,17 @@ export const HomePage: React.FC = () => {
 
         </div>
       )}
+
+      {/* Quiz modal — lifted up here so the trigger can live in the
+          Index sidebar (left column) while the modal still overlays the
+          whole window. */}
+      <QuizModal
+        isOpen={quizOpen}
+        onClose={() => setQuizOpen(false)}
+        materialId={(selectedMaterial as any)?.id ?? 0}
+        tree={matIndex?.tree ?? null}
+        targetNode={quizTargetNode}
+      />
 
     </div>
   );
